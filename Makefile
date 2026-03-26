@@ -12,5 +12,5 @@ link: linker.ld
 run:
 	qemu-system-i386 -m 3G -kernel myos
 
-clear:
+clean:
 	rm ./*.o ./myos

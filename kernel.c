@@ -150,25 +150,23 @@ struct multiboot_mmap_entry
 } __attribute__((packed));
 typedef struct multiboot_mmap_entry multiboot_memory_map_t;
 
-struct block_metadata
-{
-    uint64_t base_addr;
-    uint64_t total_pages;
-#define METADATA_STATUS_AVAILABLE  1
-#define METADATA_STATUS_ALLOCATED  2
-    uint32_t status;
+#define TOTAL_PAGES 1024
 
-    struct block_metadata *next;
-    struct block_metadata *prev;
-};
-typedef struct block_metadata block_metadata_t;
-
-struct buddy_allocator
+struct page_metadata
 {
-    // uint64_t base_addr;
-    block_metadata_t *order[11];
+#define PAGE_STATUS_AVAILABLE 1
+#define PAGE_STATUS_ALLOCATED 2
+    uint8_t status;
+    uint64_t pages;
 };
-typedef struct buddy_allocator buddy_allocator_t;
+typedef struct page_metadata page_metadata_t;
+
+struct memory_metadata
+{
+    uintptr_t base_addr;
+    page_metadata_t pages[TOTAL_PAGES];
+};
+typedef struct memory_metadata memory_metadata_t;
 
 #define PAGE_SIZE 4096
 
@@ -315,30 +313,70 @@ multiboot_memory_map_t* fetch_highest_mem_block(multiboot_memory_map_t *mmap)
     return ptr;
 }
 
-uint64_t insert_kernel_padding(multiboot_memory_map_t *mem_block)
+uintptr_t insert_metadata_offset(multiboot_memory_map_t *mem_block)
 {
     uint64_t kernel_end = align_up_4k((uintptr_t) __kernel_end);
     for (uint64_t ptr = mem_block->addr; ptr < mem_block->addr + mem_block->len; ptr += PAGE_SIZE) {
-        if (ptr > (uint64_t) align_up_4k(kernel_end + sizeof(buddy_allocator_t))) {
+        if (ptr > (uint64_t) align_up_4k(kernel_end + sizeof(memory_metadata_t))) {
             return ptr;
         }
     }
+
+    return (uintptr_t) NULL;
 }
 
-void init_physical_memory_metadata(multiboot_memory_map_t *mmap)
+void init_bitmap_memory(multiboot_memory_map_t *mmap)
 {
-    buddy_allocator_t *buddy_allocator = (buddy_allocator_t*) align_up_4k((uintptr_t) __kernel_end);
     multiboot_memory_map_t *highest_mem_block = fetch_highest_mem_block(mmap);
-    uint64_t padded_addr = insert_kernel_padding(highest_mem_block);
+    uintptr_t offset_addr = insert_metadata_offset(highest_mem_block);
 
-    block_metadata_t *init_memory_metadata;
-    init_memory_metadata->base_addr = padded_addr;
-    init_memory_metadata->total_pages = highest_mem_block->len >> 12;
-    init_memory_metadata->status = METADATA_STATUS_AVAILABLE;
-    init_memory_metadata->next = NULL;
-    init_memory_metadata->prev = NULL;
+    memory_metadata_t *memory_metadata = (memory_metadata_t*) align_up_4k((uintptr_t) __kernel_end);
+    memory_metadata->base_addr = offset_addr;
 
-    buddy_allocator->order[0] = init_memory_metadata;
+    for (uint64_t i = 0; i < TOTAL_PAGES; i++) {
+        memory_metadata->pages[i].status = PAGE_STATUS_AVAILABLE;
+        memory_metadata->pages[i].pages = 0;
+    }
+}
+
+void* kmalloc(uint32_t size)
+{
+    if (size == 0) return NULL;
+
+    memory_metadata_t *memory_metadata = (memory_metadata_t*) align_up_4k((uintptr_t) __kernel_end);
+    uint32_t page_index = 0;
+    uint32_t pages = (size / PAGE_SIZE) - 1;
+    if (size % PAGE_SIZE > 0) pages++;
+
+    for (; page_index < TOTAL_PAGES; page_index++) {
+        if (memory_metadata->pages[page_index].status != PAGE_STATUS_AVAILABLE) {
+            page_index += memory_metadata->pages[page_index].pages;
+            continue;
+        }
+
+        uint32_t continuous_pages = 0;
+        for (uint32_t j = page_index + 1; j < TOTAL_PAGES; j++) {
+            if (continuous_pages == pages) break;
+            if (memory_metadata->pages[j].status == PAGE_STATUS_ALLOCATED) break;
+            if (memory_metadata->pages[j].status == PAGE_STATUS_AVAILABLE) continuous_pages++;
+        }
+
+        if (continuous_pages == pages) break;
+    }
+
+    memory_metadata->pages[page_index].status = PAGE_STATUS_ALLOCATED;
+    memory_metadata->pages[page_index].pages = pages;
+
+    return (void*) (memory_metadata->base_addr + (page_index * PAGE_SIZE));
+}
+
+void kmfree(void *ptr)
+{
+    memory_metadata_t *memory_metadata = (memory_metadata_t*) align_up_4k((uintptr_t) __kernel_end);
+    uint32_t page_index = ((uintptr_t) ptr - memory_metadata->base_addr) / PAGE_SIZE;
+
+    memory_metadata->pages[page_index].pages = 0;
+    memory_metadata->pages[page_index].status = PAGE_STATUS_AVAILABLE;
 }
 
 void kernel_main(unsigned long magic, unsigned long mbi_addr) 
@@ -348,7 +386,16 @@ void kernel_main(unsigned long magic, unsigned long mbi_addr)
 
 	terminal_initialize();
 
-    init_physical_memory_metadata(mmap);
-    buddy_allocator_t *buddy_allocator = (buddy_allocator_t*) align_up_4k((uintptr_t) __kernel_end);
-    // terminal_writehex(buddy_allocator->order[0]->base_addr);
+    init_bitmap_memory(mmap);
+
+    uint32_t *addr2 = kmalloc(12);
+
+    terminal_writeuint((uintptr_t) addr2);
+    terminal_writestring(" - ");
+    kmfree(addr2);
+
+    uint32_t *addr3 = kmalloc(15);
+    terminal_writeuint((uintptr_t) addr3);
+
+    memory_metadata_t *memory_metadata = (memory_metadata_t*) align_up_4k((uintptr_t) __kernel_end);
 }
