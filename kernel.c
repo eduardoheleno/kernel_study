@@ -13,6 +13,7 @@
 #endif
 
 extern char __kernel_end[];
+extern void gdt_flush(void);
 
 /* Hardware text mode color constants. */
 enum vga_color {
@@ -171,6 +172,27 @@ typedef struct memory_metadata memory_metadata_t;
 #define PAGE_SIZE 4096
 
 multiboot_info_t *mbi;
+
+struct gdt_entry
+{
+    unsigned short limit_low;
+    unsigned short base_low;
+    unsigned char base_middle;
+    unsigned char access;
+    unsigned char granularity;
+    unsigned char base_high;
+} __attribute__((packed));
+typedef struct gdt_entry gdt_entry_t;
+
+struct gdt
+{
+    unsigned short limit;
+    unsigned int base;
+} __attribute__((packed));
+typedef struct gdt gdt_t;
+
+gdt_entry_t gdt_entries[3];
+gdt_t gdt;
 
 static inline uint8_t vga_entry_color(enum vga_color fg, enum vga_color bg) 
 {
@@ -337,6 +359,8 @@ void init_bitmap_memory(multiboot_memory_map_t *mmap)
         memory_metadata->pages[i].status = PAGE_STATUS_AVAILABLE;
         memory_metadata->pages[i].pages = 0;
     }
+
+    terminal_writestring("Physical memory initiated!\n");
 }
 
 void* kmalloc(uint32_t size)
@@ -379,6 +403,33 @@ void kmfree(void *ptr)
     memory_metadata->pages[page_index].status = PAGE_STATUS_AVAILABLE;
 }
 
+void gdt_set_gate(int num, unsigned long base, unsigned long limit, unsigned char access, unsigned char gran)
+{
+    gdt_entries[num].base_low = (base & 0xFFFF);
+    gdt_entries[num].base_middle = (base >> 16) & 0xFF;
+    gdt_entries[num].base_high = (base >> 24) & 0xFF;
+
+    gdt_entries[num].limit_low = (limit & 0xFFFF);
+    gdt_entries[num].granularity = ((limit >> 16) & 0x0F);
+
+    gdt_entries[num].granularity |= (gran & 0xF0);
+    gdt_entries[num].access = access;
+}
+
+void gdt_install()
+{
+    gdt.limit = (sizeof(gdt_entry_t) * 3) - 1;
+    gdt.base = (uintptr_t) gdt_entries;
+
+    gdt_set_gate(0, 0, 0, 0, 0);
+    gdt_set_gate(1, 0, 0xFFFFFFFF, 0x9A, 0xCF);
+    gdt_set_gate(2, 0, 0xFFFFFFFF, 0x92, 0xCF);
+
+    gdt_flush();
+
+    terminal_writestring("GDT initiated!\n");
+}
+
 void kernel_main(unsigned long magic, unsigned long mbi_addr) 
 {
     mbi = (multiboot_info_t*) mbi_addr;
@@ -387,15 +438,5 @@ void kernel_main(unsigned long magic, unsigned long mbi_addr)
 	terminal_initialize();
 
     init_bitmap_memory(mmap);
-
-    uint32_t *addr2 = kmalloc(12);
-
-    terminal_writeuint((uintptr_t) addr2);
-    terminal_writestring(" - ");
-    kmfree(addr2);
-
-    uint32_t *addr3 = kmalloc(15);
-    terminal_writeuint((uintptr_t) addr3);
-
-    memory_metadata_t *memory_metadata = (memory_metadata_t*) align_up_4k((uintptr_t) __kernel_end);
+    gdt_install();
 }
