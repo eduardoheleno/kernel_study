@@ -194,6 +194,33 @@ typedef struct gdt gdt_t;
 gdt_entry_t gdt_entries[3];
 gdt_t gdt;
 
+struct idt_entry
+{
+	uint16_t    isr_low;
+	uint16_t    kernel_cs;
+	uint8_t     reserved;
+	uint8_t     attributes;
+	uint16_t    isr_high;
+} __attribute__((packed));
+typedef struct idt_entry idt_entry_t;
+
+struct idt
+{
+    uint16_t limit;
+    uint32_t base;
+} __attribute__((packed));
+typedef struct idt idt_t;
+
+idt_entry_t idt_entries[256];
+idt_t idt;
+
+void terminal_writestring(const char* data);
+
+void exception_handler() {
+    terminal_writestring("exception_handler\n");
+    __asm__ ("cli; hlt");
+}
+
 static inline uint8_t vga_entry_color(enum vga_color fg, enum vga_color bg) 
 {
 	return fg | bg << 4;
@@ -360,7 +387,7 @@ void init_bitmap_memory(multiboot_memory_map_t *mmap)
         memory_metadata->pages[i].pages = 0;
     }
 
-    terminal_writestring("Physical memory initiated!\n");
+    terminal_writestring("Physical memory initialized!\n");
 }
 
 void* kmalloc(uint32_t size)
@@ -416,7 +443,7 @@ void gdt_set_gate(int num, unsigned long base, unsigned long limit, unsigned cha
     gdt_entries[num].access = access;
 }
 
-void gdt_install()
+void gdt_init()
 {
     gdt.limit = (sizeof(gdt_entry_t) * 3) - 1;
     gdt.base = (uintptr_t) gdt_entries;
@@ -427,7 +454,95 @@ void gdt_install()
 
     gdt_flush();
 
-    terminal_writestring("GDT initiated!\n");
+    terminal_writestring("GDT initialized!\n");
+}
+
+void idt_set_descriptor(uint8_t vector, void* isr, uint8_t flags)
+{
+    idt_entry_t *descriptor = &idt_entries[vector];
+
+    descriptor->isr_low = (uint32_t)isr & 0xFFFF;
+    descriptor->kernel_cs = 0x08;
+    descriptor->attributes = flags;
+    descriptor->isr_high = (uint32_t)isr >> 16;
+    descriptor->reserved = 0;
+}
+
+extern void *isr_stub_table[];
+void idt_init(void)
+{
+    idt.base = (uintptr_t) &idt_entries[0];
+    idt.limit = sizeof(idt_entry_t) * 32 - 1;
+
+    for (uint8_t vector = 0; vector < 32; vector++) {
+        idt_set_descriptor(vector, isr_stub_table[vector], 0x8E);
+    }
+
+    __asm__ volatile ("lidt %0" : : "m"(idt));
+    __asm__ volatile ("sti");
+
+    terminal_writestring("IDT initialized!\n");
+}
+
+static inline void outb(uint16_t port, uint8_t val)
+{
+    __asm__ volatile ("outb %b0, %w1" : : "a"(val), "Nd"(port) : "memory");
+}
+
+static inline uint8_t inb(uint16_t port)
+{
+    uint8_t ret;
+    __asm__ volatile ("inb %w1, %b0"
+            : "=a"(ret)
+            : "Nd"(port)
+            : "memory");
+
+    return ret;
+}
+
+static inline void io_wait(void)
+{
+    outb(0x80, 0);
+}
+
+#define PIC1		0x20		/* IO base address for master PIC */
+#define PIC2		0xA0		/* IO base address for slave PIC */
+#define PIC1_COMMAND	PIC1
+#define PIC1_DATA	(PIC1+1)
+#define PIC2_COMMAND	PIC2
+#define PIC2_DATA	(PIC2+1)
+
+#define ICW1_ICW4	0x01		/* Indicates that ICW4 will be present */
+#define ICW1_INIT	0x10		/* Initialization - required! */
+
+#define ICW4_8086	0x01		/* 8086/88 (MCS-80/85) mode */
+
+#define CASCADE_IRQ 2
+void pic_init(int offset1, int offset2)
+{
+    outb(PIC1_COMMAND, ICW1_INIT | ICW1_ICW4);
+    io_wait();
+    outb(PIC2_COMMAND, ICW1_INIT | ICW1_ICW4);
+    io_wait();
+    outb(PIC1_DATA, offset1);
+    io_wait();
+    outb(PIC2_DATA, offset2);
+    io_wait();
+
+    outb(PIC1_DATA, 1 << CASCADE_IRQ);
+    io_wait();
+    outb(PIC2_DATA, 2);
+    io_wait();
+
+    outb(PIC1_DATA, ICW4_8086);
+    io_wait();
+    outb(PIC2_DATA, ICW4_8086);
+    io_wait();
+
+    outb(PIC1_DATA, 0);
+    outb(PIC2_DATA, 0);
+
+    terminal_writestring("PIC initialized!\n");
 }
 
 void kernel_main(unsigned long magic, unsigned long mbi_addr) 
@@ -438,5 +553,15 @@ void kernel_main(unsigned long magic, unsigned long mbi_addr)
 	terminal_initialize();
 
     init_bitmap_memory(mmap);
-    gdt_install();
+    gdt_init();
+    idt_init();
+    pic_init(0x20, 0x28);
+
+    while (1) {
+        if ((inb(0x64) & 2) == 0) break;
+    }
+
+    terminal_writestring("teste");
+
+    // volatile uint16_t test = 2 / 0;
 }
