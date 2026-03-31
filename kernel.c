@@ -469,17 +469,20 @@ void idt_set_descriptor(uint8_t vector, void* isr, uint8_t flags)
 }
 
 extern void *isr_stub_table[];
+extern void irq1_stub(void);
+
 void idt_init(void)
 {
     idt.base = (uintptr_t) &idt_entries[0];
-    idt.limit = sizeof(idt_entry_t) * 32 - 1;
+    idt.limit = sizeof(idt_entry_t) * 256 - 1;
 
     for (uint8_t vector = 0; vector < 32; vector++) {
         idt_set_descriptor(vector, isr_stub_table[vector], 0x8E);
     }
 
+    idt_set_descriptor(33, irq1_stub, 0x8E);
+
     __asm__ volatile ("lidt %0" : : "m"(idt));
-    __asm__ volatile ("sti");
 
     terminal_writestring("IDT initialized!\n");
 }
@@ -505,12 +508,12 @@ static inline void io_wait(void)
     outb(0x80, 0);
 }
 
-#define PIC1		0x20		/* IO base address for master PIC */
-#define PIC2		0xA0		/* IO base address for slave PIC */
-#define PIC1_COMMAND	PIC1
-#define PIC1_DATA	(PIC1+1)
-#define PIC2_COMMAND	PIC2
-#define PIC2_DATA	(PIC2+1)
+#define PIC1            0x20
+#define PIC2            0xA0
+#define PIC1_COMMAND    PIC1
+#define PIC1_DATA       (PIC1 + 1)
+#define PIC2_COMMAND    PIC2
+#define PIC2_DATA       (PIC2 + 1)
 
 #define ICW1_ICW4	0x01		/* Indicates that ICW4 will be present */
 #define ICW1_INIT	0x10		/* Initialization - required! */
@@ -539,10 +542,65 @@ void pic_init(int offset1, int offset2)
     outb(PIC2_DATA, ICW4_8086);
     io_wait();
 
-    outb(PIC1_DATA, 0);
-    outb(PIC2_DATA, 0);
+    outb(PIC1_DATA, 0xFD);
+    outb(PIC2_DATA, 0xFF);
 
     terminal_writestring("PIC initialized!\n");
+}
+
+enum KYBRD_CTRL_STATS_MASK {
+	KYBRD_CTRL_STATS_MASK_OUT_BUF	=	1,          //00000001
+	KYBRD_CTRL_STATS_MASK_IN_BUF	=	2,          //00000010
+	KYBRD_CTRL_STATS_MASK_SYSTEM	=	4,          //00000100
+	KYBRD_CTRL_STATS_MASK_CMD_DATA	=	8,          //00001000
+	KYBRD_CTRL_STATS_MASK_LOCKED	=	0x10,		//00010000
+	KYBRD_CTRL_STATS_MASK_AUX_BUF	=	0x20,		//00100000
+	KYBRD_CTRL_STATS_MASK_TIMEOUT	=	0x40,		//01000000
+	KYBRD_CTRL_STATS_MASK_PARITY	=	0x80		//10000000
+};
+
+uint8_t kybrd_ctrl_read_status()
+{
+    return inb(0x64);
+}
+
+void kybrd_ctrl_send_cmd(uint8_t cmd)
+{
+    while (1) {
+        if ((kybrd_ctrl_read_status() & KYBRD_CTRL_STATS_MASK_IN_BUF) == 0) break;
+    }
+
+    outb(0x64, cmd);
+}
+
+static void pic_send_eoi(uint8_t irq)
+{
+    if (irq >= 8) {
+        outb(PIC2_COMMAND, 0x20);
+    }
+
+    outb(PIC1_COMMAND, 0x20);
+}
+
+static const char *scancodes[] = {
+    NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+    "q", "w", "e", "r", "t", "y", "u", "i", "o", "p",
+    NULL, NULL, "\n", NULL,
+    "a", "s", "d", "f", "g", "h", "j", "k", "l",
+    NULL, NULL, NULL, NULL, NULL,
+    "z", "x", "c", "v", "b", "n", "m",
+    NULL, NULL, NULL, NULL, NULL, NULL, " "
+};
+
+void keyboard_interrupt_handler(void)
+{
+    uint8_t scancode = inb(0x60);
+
+    if ((scancode & 0x80) == 0) {
+        terminal_writestring(scancodes[scancode]);
+    }
+
+    pic_send_eoi(1);
 }
 
 void kernel_main(unsigned long magic, unsigned long mbi_addr) 
@@ -556,12 +614,9 @@ void kernel_main(unsigned long magic, unsigned long mbi_addr)
     gdt_init();
     idt_init();
     pic_init(0x20, 0x28);
+    __asm__ volatile ("sti");
 
-    while (1) {
-        if ((inb(0x64) & 2) == 0) break;
+    for (;;) {
+        __asm__ volatile ("hlt");
     }
-
-    terminal_writestring("teste");
-
-    // volatile uint16_t test = 2 / 0;
 }

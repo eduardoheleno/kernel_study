@@ -1,16 +1,22 @@
 .macro isr_err_stub num
 isr_stub_\num:
+    pusha
     call exception_handler
+    popa
     iret
 .endm
 
 .macro isr_no_err_stub num
 isr_stub_\num:
+    pusha
     call exception_handler
+    popa
     iret
 .endm
 
 .extern exception_handler
+.extern keyboard_interrupt_handler
+
 isr_no_err_stub 0
 isr_no_err_stub 1
 isr_no_err_stub 2
@@ -43,6 +49,13 @@ isr_no_err_stub 28
 isr_no_err_stub 29
 isr_err_stub    30
 isr_no_err_stub 31
+
+.globl irq1_stub
+irq1_stub:
+    pusha
+    call keyboard_interrupt_handler
+    popa
+    iret
 
 .globl isr_stub_table
 isr_stub_table:
