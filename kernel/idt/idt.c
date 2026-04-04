@@ -8,6 +8,12 @@ static idt_t idt;
 extern void *isr_stub_table[];
 extern void irq1_stub(void);
 
+void exception_handler() 
+{
+    terminal_writestring("exception_handler\n");
+    __asm__ ("cli; hlt");
+}
+
 static void idt_set_descriptor(uint8_t vector, void* isr, uint8_t flags)
 {
     idt_entry_t *descriptor = &idt_entries[vector];

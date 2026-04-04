@@ -1,0 +1,16 @@
+[
+  {
+    "file": "keyboard.c",
+    "arguments": [
+      "/Users/eduardomacos/opt/cross/bin/i686-elf-gcc",
+      "-c",
+      "keyboard.c",
+      "-I./include",
+      "-I../kernel/include",
+      "-o",
+      "keyboard.o"
+    ],
+    "directory": "/Users/eduardomacos/github/kernel_study/drivers",
+    "output": "keyboard.o"
+  }
+]

@@ -9,11 +9,11 @@ gdt_asm: ./gdt/gdt.s
 idt_asm: ./idt/idt.s
 	i686-elf-as ./idt/idt.s -o idt_asm.o
 
-kernel: kernel.c tty.c memory.c ./gdt/gdt.c ./idt/idt.c
-	i686-elf-gcc -c kernel.c tty.c memory.c ./gdt/gdt.c ./idt/idt.c -I./include -std=gnu99 -ffreestanding -O2 -Wall -Wextra
+kernel: kernel.c tty.c memory.c pic.c ./gdt/gdt.c ./idt/idt.c
+	i686-elf-gcc -c kernel.c tty.c pic.c memory.c ./gdt/gdt.c ./idt/idt.c -I./include -std=gnu99 -ffreestanding -O2 -Wall -Wextra
 
 link: linker.ld
-	i686-elf-gcc -T linker.ld -o myos -ffreestanding -O2 -nostdlib boot.o gdt_asm.o gdt.o idt_asm.o idt.o tty.o memory.o kernel.o
+	i686-elf-gcc -T linker.ld -o myos -ffreestanding -O2 -nostdlib boot.o gdt_asm.o gdt.o idt_asm.o idt.o tty.o memory.o pic.o ../drivers/keyboard.o kernel.o
 
 run:
 	qemu-system-i386 -m 3G -kernel myos
