@@ -1,7 +1,9 @@
 .macro isr_err_stub num
 isr_stub_\num:
     pusha
+    push \num
     call exception_handler
+    add $4, %esp
     popa
     iret
 .endm
@@ -9,7 +11,9 @@ isr_stub_\num:
 .macro isr_no_err_stub num
 isr_stub_\num:
     pusha
+    push \num
     call exception_handler
+    add $4, %esp
     popa
     iret
 .endm

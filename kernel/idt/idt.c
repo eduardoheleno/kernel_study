@@ -8,9 +8,11 @@ static idt_t idt;
 extern void *isr_stub_table[];
 extern void irq1_stub(void);
 
-void exception_handler() 
+void exception_handler(uint8_t num)
 {
-    terminal_writestring("exception_handler\n");
+    terminal_writestring("exception_handler: ");
+    terminal_writeuint(num);
+    terminal_writestring("\n");
     __asm__ ("cli; hlt");
 }
 

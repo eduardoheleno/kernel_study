@@ -24,7 +24,7 @@ void kernel_main(unsigned long magic, unsigned long mbi_addr)
 {
 	terminal_initialize();
 
-    init_bitmap_memory(mbi_addr);
+    // init_bitmap_memory(mbi_addr);
     gdt_init();
     idt_init();
     pic_init(0x20, 0x28);
