@@ -7,6 +7,7 @@
 #include "idt.h"
 #include "memory.h"
 #include "pic.h"
+#include "misc.h"
 
 /* Check if the compiler thinks you are targeting the wrong operating system. */
 #if defined(__linux__)
@@ -20,15 +21,20 @@
 
 // #define MULTIBOOT_BOOTLOADER_MAGIC              0x2BADB002
 
-void kernel_main(unsigned long magic, unsigned long mbi_addr) 
+void kernel_main(
+        uintptr_t *boot_page_table_idx,
+        unsigned long last_paged_addr,
+        unsigned long magic,
+        unsigned long mbi_addr
+     ) 
 {
 	terminal_initialize();
 
-    // init_bitmap_memory(mbi_addr);
-    gdt_init();
-    idt_init();
-    pic_init(0x20, 0x28);
-    __asm__ volatile ("sti");
+    init_bitmap_memory(mbi_addr, last_paged_addr, boot_page_table_idx);
+    // gdt_init();
+    // idt_init();
+    // pic_init(0x20, 0x28);
+    // __asm__ volatile ("sti");
 
     for (;;) {
         __asm__ volatile ("hlt");

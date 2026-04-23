@@ -34,4 +34,9 @@ static inline void io_wait(void)
     outb(0x80, 0);
 }
 
+static inline void invlpg(unsigned long addr) 
+{
+    asm volatile("invlpg (%0)" ::"r" (addr) : "memory");
+}
+
 #endif

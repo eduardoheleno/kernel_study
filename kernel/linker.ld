@@ -2,12 +2,12 @@ ENTRY (_start)
 
 SECTIONS
 {
+	_kernel_start = .;
     . = 0x00100000;
 	/* The kernel will live at 3GB + 1MB in the virtual address space, */
 	/* which will be mapped to 1MB in the physical address space. */
 	/* Note that we page-align the sections. */
 
-	_kernel_start = .;
     .multiboot.data : {
         *(.multiboot.data)
     }
@@ -27,6 +27,7 @@ SECTIONS
 	{
 		*(.rodata)
 	}
+    /* TODO: _end_readonly_section its not being considered */
     _end_readonly_section = .;
 
 	.data ALIGN (4K) : AT (ADDR (.data) - 0xC0000000)
@@ -40,6 +41,5 @@ SECTIONS
 		*(.bootstrap_stack)
 	}
 
-	_kernel_end = .;
-    __kernel_end = .;
+	_kernel_end = . - 0xC0000000;
 }

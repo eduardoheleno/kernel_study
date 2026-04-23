@@ -39,12 +39,10 @@ _start:
 	# Only map the kernel.
 	cmpl $_kernel_start, %esi
 	jl 3f
-	cmpl $(_kernel_end - 0xC0000000), %esi
+	cmpl $_kernel_end, %esi
 	jge 4f
 
 	movl %esi, %edx
-    cmpl $(_readonly_section - 0xC0000000), %esi
-    jl readonly_page
 
 	orl $0x003, %edx
 2:	movl %edx, (%edi)
@@ -81,9 +79,7 @@ _start:
 	orl $0x80010000, %ecx
 	movl %ecx, %cr0
 
-	# Jump to higher half with an absolute jump. 
-	lea 5f, %ecx
-	jmp *%ecx
+    jmp 5f
 
 .section .text
 
@@ -91,7 +87,6 @@ _start:
 	# At this point, paging is fully set up and enabled.
 
 	# Unmap the identity mapping as it is now unnecessary. 
-	movl $0, boot_page_directory + 0
 
 	# Reload crc3 to force a TLB flush so the changes to take effect.
 	movl %cr3, %ecx
@@ -101,6 +96,10 @@ _start:
 	mov $stack_top, %esp
 
 	# Enter the high-level kernel.
+    push %ebx
+    push %eax
+    push %esi
+    push %edi
 	call kernel_main
 
 	# Infinite loop if the system has nothing more to do.
