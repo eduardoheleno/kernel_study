@@ -30,7 +30,23 @@ void kernel_main(
 {
 	terminal_initialize();
 
-    init_bitmap_memory(mbi_addr, last_paged_addr, boot_page_table_idx);
+    init_memory_bitmap(mbi_addr, last_paged_addr, boot_page_table_idx);
+
+    uintptr_t *test = pmm_alloc(1);
+    terminal_writehex((uint32_t) test);
+    terminal_writestring("\n");
+
+    uintptr_t *test2 = pmm_alloc(1);
+    terminal_writehex((uint32_t) test2);
+    terminal_writestring("\n");
+
+    uintptr_t *test3 = pmm_alloc(2);
+    terminal_writehex((uint32_t) test3);
+
+    terminal_writestring("\n");
+
+    uintptr_t *test4 = pmm_alloc(1);
+    terminal_writehex((uint32_t) test4);
     // gdt_init();
     // idt_init();
     // pic_init(0x20, 0x28);

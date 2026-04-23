@@ -5,8 +5,11 @@
 
 #define PAGE_SIZE 4096
 
-void init_bitmap_memory(unsigned long mbi_addr, unsigned long last_paged_addr, uintptr_t *boot_page_table_idx);
-void* kmalloc(uint32_t size);
-void kmfree(void *ptr);
+#define BITMAP_USED 1
+#define BITMAP_FREE 0
+
+void init_memory_bitmap(unsigned long mbi_addr, unsigned long last_paged_addr, uintptr_t *boot_page_table_idx);
+void* pmm_alloc(uint32_t npages);
+void pmm_free(void *addr, uint32_t npages);
 
 #endif
