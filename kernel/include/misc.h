@@ -39,4 +39,15 @@ static inline void invlpg(unsigned long addr)
     asm volatile("invlpg (%0)" ::"r" (addr) : "memory");
 }
 
+static inline void reload_cr3(void) 
+{
+    asm volatile (
+        "mov %%cr3, %%eax\n\t"
+        "mov %%eax, %%cr3"
+        :
+        :
+        : "eax", "memory"
+    );
+}
+
 #endif

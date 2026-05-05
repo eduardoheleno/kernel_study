@@ -16,8 +16,9 @@ stack_bottom:
 stack_top:
 
 .section .bss, "aw", @nobits
-	.align 4096
-boot_page_directory:
+.global kernel_page_directory
+.align 4096
+kernel_page_directory:
 	.skip 4096
 boot_page_table1:
 	.skip 4096
@@ -67,11 +68,11 @@ _start:
 	# would instead page fault if there was no identity mapping.
 
 	# Map the page table to both virtual addresses 0x00000000 and 0xC0000000.
-	movl $(boot_page_table1 - 0xC0000000 + 0x003), boot_page_directory - 0xC0000000 + 0
-	movl $(boot_page_table1 - 0xC0000000 + 0x003), boot_page_directory - 0xC0000000 + 768 * 4
+	movl $(boot_page_table1 - 0xC0000000 + 0x003), kernel_page_directory - 0xC0000000 + 0
+	movl $(boot_page_table1 - 0xC0000000 + 0x003), kernel_page_directory - 0xC0000000 + 768 * 4
 
-	# Set cr3 to the address of the boot_page_directory.
-	movl $(boot_page_directory - 0xC0000000), %ecx
+	# Set cr3 to the address of the kernel_page_directory.
+	movl $(kernel_page_directory - 0xC0000000), %ecx
 	movl %ecx, %cr3
 
 	# Enable paging and the write-protect bit.
@@ -85,8 +86,6 @@ _start:
 
 5:
 	# At this point, paging is fully set up and enabled.
-
-	# Unmap the identity mapping as it is now unnecessary. 
 
 	# Reload crc3 to force a TLB flush so the changes to take effect.
 	movl %cr3, %ecx

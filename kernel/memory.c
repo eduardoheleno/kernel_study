@@ -6,8 +6,15 @@
 #include <stddef.h>
 
 extern char _kernel_start;
-uint8_t *bitmap = NULL;
-uint64_t bitmap_size = 0;
+extern uintptr_t kernel_page_directory[];
+
+static uintptr_t temp_map_addr;
+static uintptr_t kernel_heap_start;
+
+// TODO: current bitmap is using 8 bytes for every page which is pretty non efficient
+// The right approach is to use bitwise operations to use a single bit for each page
+static uint8_t *bitmap = NULL;
+static uint64_t bitmap_size = 0;
 
 static multiboot_memory_map_t* fetch_highest_block(multiboot_info_t *mbi, multiboot_memory_map_t *mmap)
 {
@@ -62,7 +69,67 @@ static void populate_bitmap(multiboot_info_t *mbi, multiboot_memory_map_t *mmap,
     set_used_bitmaps(start_index, total_used_pages);
 }
 
-void init_memory_bitmap(unsigned long mbi_addr, unsigned long last_paged_addr, uintptr_t *boot_page_table_idx)
+static void unmap_identity()
+{
+    asm volatile (
+        "movl $0, kernel_page_directory + 0"
+    );
+}
+
+static void *map_temp_page(uintptr_t phys_addr)
+{
+    uintptr_t pde = kernel_page_directory[PDE_INDEX(temp_map_addr)];
+    uint32_t *temp_page_table = (uint32_t*) ((pde & PAGE_MASK) + KERNEL_BASE);
+ 
+    temp_page_table[PTE_INDEX(temp_map_addr)] = (phys_addr & PAGE_MASK) | PAGE_PRESENT | PAGE_WRITABLE;
+
+    invlpg(temp_map_addr);
+
+    return (void*) temp_map_addr;
+}
+
+static void unmap_temp_page(void)
+{
+    uintptr_t pde = kernel_page_directory[PDE_INDEX(temp_map_addr)];
+    uint32_t *temp_page_table = (uint32_t*) ((pde & PAGE_MASK) + KERNEL_BASE);
+ 
+    temp_page_table[PTE_INDEX(temp_map_addr)] = 0;
+
+    invlpg(temp_map_addr);
+}
+
+static void test()
+{
+    uintptr_t pde = kernel_page_directory[768];
+    uintptr_t *pt = map_temp_page(pde);
+
+    terminal_writehex(kernel_heap_start);
+    // terminal_writehex(pt[523]);
+    terminal_writestring("\n");
+    terminal_writehex(align_up_4k(kernel_heap_start));
+    // terminal_writehex(page_table[524]);
+
+    // terminal_writehex(temp_map_addr);
+
+    // uint32_t empty_index = 0;
+    // for (; empty_index < 1024; empty_index++) {
+    //     if (page_table[empty_index] == 0) {
+    //         // terminal_writeuint(empty_index);
+    //         break;
+    //     }
+    // }
+
+    // terminal_writehex(temp_map_addr);
+    // terminal_writestring("\n");
+    // terminal_writehex(kernel_heap_start);
+    // terminal_writeuint(kernel_heap_start >> 22);
+    // terminal_writestring("\n");
+    // terminal_writeuint((kernel_heap_start >> 12) & 0x3FF);
+    // terminal_writestring(" - ");
+    // terminal_writeuint(empty_index);
+}
+
+void init_memory_bitmap(unsigned long mbi_addr, unsigned long last_paged_addr, uintptr_t *kernel_page_table_idx)
 {
     multiboot_info_t *mbi = (multiboot_info_t*) mbi_addr;
     multiboot_memory_map_t *mmap = (multiboot_memory_map_t*) mbi->mmap_addr;
@@ -77,22 +144,30 @@ void init_memory_bitmap(unsigned long mbi_addr, unsigned long last_paged_addr, u
     uint64_t total_bitmap_pages = bitmap_len / PAGE_SIZE;
 
     for (uint64_t i = 0; i < total_bitmap_pages; i++) {
-        *boot_page_table_idx = kernel_end_addr | 0x003;
+        *kernel_page_table_idx = kernel_end_addr | PAGE_PRESENT | PAGE_WRITABLE;
 
         kernel_end_addr += PAGE_SIZE;
-        boot_page_table_idx++;
+        kernel_page_table_idx++;
     }
 
-    invlpg(0);
+    temp_map_addr = kernel_end_addr + KERNEL_BASE;
+    kernel_heap_start = temp_map_addr + PAGE_SIZE;
 
-    bitmap = (uint8_t*) align_up_4k(last_paged_addr);
+    bitmap = (uint8_t*) align_up_4k(last_paged_addr + KERNEL_BASE);
     for (uint64_t i = 0; i < bitmap_size; i++) {
         bitmap[i] = BITMAP_FREE;
     }
 
-    populate_bitmap(mbi, mmap, kernel_end_addr);
+    terminal_writehex(temp_map_addr);
+    // terminal_writestring("\n");
+    // terminal_writehex(kernel_end_addr);
 
-    terminal_writestring("Page frame allocator initialized!\n");
+    populate_bitmap(mbi, mmap, kernel_end_addr);
+    unmap_identity();
+    reload_cr3();
+
+    // terminal_writestring("Page frame allocator initialized!\n");
+    // test();
 }
 
 void* pmm_alloc(uint32_t npages)
@@ -118,7 +193,7 @@ void* pmm_alloc(uint32_t npages)
 
 void pmm_free(void *addr, uint32_t npages)
 {
-    //TODO: implement check for non valid addresses
+    // TODO: implement check for non valid addresses
     uint64_t bitmap_idx = (uintptr_t) addr / PAGE_SIZE;
     for (uint64_t i = 0; i < npages; i++) {
         bitmap[bitmap_idx] = BITMAP_FREE;
