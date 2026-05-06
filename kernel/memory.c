@@ -11,6 +11,9 @@ extern uintptr_t kernel_page_directory[];
 static uintptr_t temp_map_addr;
 static uintptr_t kernel_heap_start;
 
+static kheap_block_t *head_block = NULL;
+static size_t allocated_pages = 0;
+
 // TODO: current bitmap is using 8 bytes for every page which is pretty non efficient
 // The right approach is to use bitwise operations to use a single bit for each page
 static uint8_t *bitmap = NULL;
@@ -76,7 +79,7 @@ static void unmap_identity()
     );
 }
 
-static void *map_temp_page(uintptr_t phys_addr)
+static uintptr_t* map_temp_page(uintptr_t phys_addr)
 {
     uintptr_t pde = kernel_page_directory[PDE_INDEX(temp_map_addr)];
     uint32_t *temp_page_table = (uint32_t*) ((pde & PAGE_MASK) + KERNEL_BASE);
@@ -85,7 +88,7 @@ static void *map_temp_page(uintptr_t phys_addr)
 
     invlpg(temp_map_addr);
 
-    return (void*) temp_map_addr;
+    return (uintptr_t*) temp_map_addr;
 }
 
 static void unmap_temp_page(void)
@@ -98,35 +101,35 @@ static void unmap_temp_page(void)
     invlpg(temp_map_addr);
 }
 
-static void test()
+static uintptr_t pmm_alloc(uint32_t npages)
 {
-    uintptr_t pde = kernel_page_directory[768];
-    uintptr_t *pt = map_temp_page(pde);
+    // TODO: implement check for full physical memory usage
+    uint64_t i = 0;
+    uint32_t page_accumulator = 0;
+    for (; i < bitmap_size; i++) {
+        if (bitmap[i] != BITMAP_FREE) {
+            page_accumulator = 0;
+        } else {
+            page_accumulator++;
+            if (page_accumulator == npages) break;
+        }
+    }
 
-    terminal_writehex(kernel_heap_start);
-    // terminal_writehex(pt[523]);
-    terminal_writestring("\n");
-    terminal_writehex(align_up_4k(kernel_heap_start));
-    // terminal_writehex(page_table[524]);
+    for (uint64_t j = i - (npages - 1); j <= i; j++) {
+        bitmap[j] = BITMAP_USED;
+    }
 
-    // terminal_writehex(temp_map_addr);
+    return ((i - (npages - 1)) * PAGE_SIZE);
+}
 
-    // uint32_t empty_index = 0;
-    // for (; empty_index < 1024; empty_index++) {
-    //     if (page_table[empty_index] == 0) {
-    //         // terminal_writeuint(empty_index);
-    //         break;
-    //     }
-    // }
-
-    // terminal_writehex(temp_map_addr);
-    // terminal_writestring("\n");
-    // terminal_writehex(kernel_heap_start);
-    // terminal_writeuint(kernel_heap_start >> 22);
-    // terminal_writestring("\n");
-    // terminal_writeuint((kernel_heap_start >> 12) & 0x3FF);
-    // terminal_writestring(" - ");
-    // terminal_writeuint(empty_index);
+static void pmm_free(void *addr, uint32_t npages)
+{
+    // TODO: implement check for non valid addresses
+    uint64_t bitmap_idx = (uintptr_t) addr / PAGE_SIZE;
+    for (uint64_t i = 0; i < npages; i++) {
+        bitmap[bitmap_idx] = BITMAP_FREE;
+        bitmap_idx++;
+    }
 }
 
 void init_memory_bitmap(unsigned long mbi_addr, unsigned long last_paged_addr, uintptr_t *kernel_page_table_idx)
@@ -158,7 +161,7 @@ void init_memory_bitmap(unsigned long mbi_addr, unsigned long last_paged_addr, u
         bitmap[i] = BITMAP_FREE;
     }
 
-    terminal_writehex(temp_map_addr);
+    // terminal_writehex(temp_map_addr);
     // terminal_writestring("\n");
     // terminal_writehex(kernel_end_addr);
 
@@ -166,37 +169,99 @@ void init_memory_bitmap(unsigned long mbi_addr, unsigned long last_paged_addr, u
     unmap_identity();
     reload_cr3();
 
+    uintptr_t *ptr1 = kmalloc(4096);
+    uintptr_t *ptr2 = kmalloc(4096);
+
+    *ptr1 = 10;
+    *ptr2 = 20;
+
+    terminal_writeuint(*ptr1);
+    terminal_writestring("\n");
+    terminal_writeuint(*ptr2);
+    //
+    // *ptr = 100;
+    // terminal_writeuint(*ptr);
+    //
+    // uintptr_t *ptr2 = kmalloc(10);
+    // terminal_writehex((uintptr_t) ptr);
+
     // terminal_writestring("Page frame allocator initialized!\n");
     // test();
 }
 
-void* pmm_alloc(uint32_t npages)
+uintptr_t* kmalloc(size_t size)
 {
-    // TODO: implement check for full physical memory usage
-    uint64_t i = 0;
-    uint32_t page_accumulator = 0;
-    for (; i < bitmap_size; i++) {
-        if (bitmap[i] != BITMAP_FREE) {
-            page_accumulator = 0;
-        } else {
-            page_accumulator++;
-            if (page_accumulator == npages) break;
+    if (head_block == NULL) {
+        // TODO: with 1 fixed physical page it could run in trouble if the kernel wants to allocate more than 1 page of size (4096 bytes)
+        // TODO: check if all available kernel heap was consumed
+        uintptr_t page_phys_addr = pmm_alloc(1);
+        uintptr_t *new_page_table = map_temp_page(page_phys_addr);
+
+        for (uint32_t i = 0; i < 1024; i++) {
+            new_page_table[i] = 0;
         }
-    }
 
-    for (uint64_t j = i - (npages - 1); j <= i; j++) {
-        bitmap[j] = BITMAP_USED;
-    }
+        unmap_temp_page();
 
-    return (void*) ((i - (npages - 1)) * PAGE_SIZE);
-}
+        uintptr_t pde = kernel_page_directory[PDE_INDEX(kernel_heap_start)];
+        uintptr_t *kernel_page_table = map_temp_page(pde);
 
-void pmm_free(void *addr, uint32_t npages)
-{
-    // TODO: implement check for non valid addresses
-    uint64_t bitmap_idx = (uintptr_t) addr / PAGE_SIZE;
-    for (uint64_t i = 0; i < npages; i++) {
-        bitmap[bitmap_idx] = BITMAP_FREE;
-        bitmap_idx++;
+        kernel_page_table[PTE_INDEX(kernel_heap_start)] = (page_phys_addr & PAGE_MASK) | PAGE_PRESENT | PAGE_WRITABLE;
+        allocated_pages++;
+
+        unmap_temp_page();
+        invlpg(kernel_heap_start);
+
+        kheap_block_t *new_block = (kheap_block_t*) kernel_heap_start;
+        new_block->free = 0;
+        new_block->size = sizeof(kheap_block_t) + size;
+        new_block->next = NULL;
+        new_block->prev = NULL;
+
+        head_block = new_block;
+
+        return (uintptr_t*) ((uintptr_t) new_block + sizeof(kheap_block_t));
+    } else {
+        kheap_block_t *tmp = head_block;
+
+        // TODO: search a better approach to track physical addresses mapped to virtual addresses
+        for (;;) {
+            if (tmp->next == NULL) {
+                kheap_block_t *new_block = (kheap_block_t*) ((uintptr_t) tmp + tmp->size);
+                size_t allocated_target = ((uintptr_t) new_block - (uintptr_t) head_block) / PAGE_SIZE;
+                if (((uintptr_t) new_block - (uintptr_t) head_block) % PAGE_SIZE > 0) allocated_target++;
+
+                if (allocated_pages < allocated_target) {
+                    uintptr_t page_phys_addr = pmm_alloc(1);
+                    uintptr_t *new_page_table = map_temp_page(page_phys_addr);
+
+                    for (uint32_t i = 0; i < 1024; i++) {
+                        new_page_table[i] = 0;
+                    }
+
+                    unmap_temp_page();
+
+                    uintptr_t virt_addr = (uintptr_t) head_block + PAGE_SIZE;
+                    uintptr_t pde = kernel_page_directory[PDE_INDEX(virt_addr)];
+                    uintptr_t *kernel_page_table = map_temp_page(pde);
+
+                    kernel_page_table[PTE_INDEX(virt_addr)] = (page_phys_addr & PAGE_MASK) | PAGE_PRESENT | PAGE_WRITABLE;
+                    allocated_pages++;
+
+                    unmap_temp_page();
+                    invlpg(virt_addr);
+                }
+
+                new_block->free = 0;
+                new_block->size = sizeof(kheap_block_t) + size;
+                new_block->next = NULL;
+                new_block->prev = tmp;
+
+                tmp->next = new_block;
+                return (uintptr_t*) ((uintptr_t) new_block + sizeof(kheap_block_t));
+            }
+
+            tmp = tmp->next;
+        }
     }
 }
