@@ -12,7 +12,7 @@ static uintptr_t temp_map_addr;
 static uintptr_t kernel_heap_start;
 
 static kheap_block_t *head_block = NULL;
-static size_t allocated_pages = 0;
+static uintptr_t last_non_mapped_addr;
 
 // TODO: current bitmap is using 8 bytes for every page which is pretty non efficient
 // The right approach is to use bitwise operations to use a single bit for each page
@@ -161,39 +161,30 @@ void init_memory_bitmap(unsigned long mbi_addr, unsigned long last_paged_addr, u
         bitmap[i] = BITMAP_FREE;
     }
 
-    // terminal_writehex(temp_map_addr);
-    // terminal_writestring("\n");
-    // terminal_writehex(kernel_end_addr);
-
     populate_bitmap(mbi, mmap, kernel_end_addr);
     unmap_identity();
     reload_cr3();
 
-    uintptr_t *ptr1 = kmalloc(4096);
-    uintptr_t *ptr2 = kmalloc(4096);
-
+    // tests
+    uint32_t *ptr1 = kmalloc(4096);
     *ptr1 = 10;
+
+    uintptr_t *ptr2 = kmalloc(4096);
     *ptr2 = 20;
+
+    uintptr_t *ptr3 = kmalloc(2300);
+    *ptr3 = 30;
 
     terminal_writeuint(*ptr1);
     terminal_writestring("\n");
     terminal_writeuint(*ptr2);
-    //
-    // *ptr = 100;
-    // terminal_writeuint(*ptr);
-    //
-    // uintptr_t *ptr2 = kmalloc(10);
-    // terminal_writehex((uintptr_t) ptr);
-
-    // terminal_writestring("Page frame allocator initialized!\n");
-    // test();
+    terminal_writestring("\n");
+    terminal_writeuint(*ptr3);
 }
 
-uintptr_t* kmalloc(size_t size)
+static void mmap(size_t pages, uintptr_t base_addr)
 {
-    if (head_block == NULL) {
-        // TODO: with 1 fixed physical page it could run in trouble if the kernel wants to allocate more than 1 page of size (4096 bytes)
-        // TODO: check if all available kernel heap was consumed
+    for (size_t i = 0; i < pages; i++) {
         uintptr_t page_phys_addr = pmm_alloc(1);
         uintptr_t *new_page_table = map_temp_page(page_phys_addr);
 
@@ -203,65 +194,78 @@ uintptr_t* kmalloc(size_t size)
 
         unmap_temp_page();
 
-        uintptr_t pde = kernel_page_directory[PDE_INDEX(kernel_heap_start)];
+        uintptr_t pde = kernel_page_directory[PDE_INDEX(base_addr)];
         uintptr_t *kernel_page_table = map_temp_page(pde);
 
-        kernel_page_table[PTE_INDEX(kernel_heap_start)] = (page_phys_addr & PAGE_MASK) | PAGE_PRESENT | PAGE_WRITABLE;
-        allocated_pages++;
+        kernel_page_table[PTE_INDEX(base_addr)] = (page_phys_addr & PAGE_MASK) | PAGE_PRESENT | PAGE_WRITABLE;
 
         unmap_temp_page();
-        invlpg(kernel_heap_start);
+        invlpg(base_addr);
+
+        base_addr += PAGE_SIZE;
+    }
+}
+
+void* kmalloc(size_t size)
+{
+    // TODO: implement directory mapping
+    // TODO: improve code structure
+    size_t block_size = size + sizeof(kheap_block_t);
+
+    if (head_block == NULL) {
+        size_t pages = block_size / PAGE_SIZE;
+        if (block_size % PAGE_SIZE > 0) pages++;
+
+        mmap(pages, kernel_heap_start);
 
         kheap_block_t *new_block = (kheap_block_t*) kernel_heap_start;
         new_block->free = 0;
-        new_block->size = sizeof(kheap_block_t) + size;
+        new_block->size = block_size;
         new_block->next = NULL;
         new_block->prev = NULL;
 
         head_block = new_block;
+        last_non_mapped_addr = (uintptr_t) new_block + (PAGE_SIZE * pages);
 
-        return (uintptr_t*) ((uintptr_t) new_block + sizeof(kheap_block_t));
-    } else {
-        kheap_block_t *tmp = head_block;
+        return (void*) ((uintptr_t) new_block + sizeof(kheap_block_t));
+    }
 
-        // TODO: search a better approach to track physical addresses mapped to virtual addresses
-        for (;;) {
-            if (tmp->next == NULL) {
+    kheap_block_t *tmp = head_block;
+
+    for (;;) {
+        // TODO: check if head_block can be replaced in this context
+        if (tmp->next == NULL) {
+            if ((uintptr_t) tmp + tmp->size + block_size < last_non_mapped_addr) {
                 kheap_block_t *new_block = (kheap_block_t*) ((uintptr_t) tmp + tmp->size);
-                size_t allocated_target = ((uintptr_t) new_block - (uintptr_t) head_block) / PAGE_SIZE;
-                if (((uintptr_t) new_block - (uintptr_t) head_block) % PAGE_SIZE > 0) allocated_target++;
-
-                if (allocated_pages < allocated_target) {
-                    uintptr_t page_phys_addr = pmm_alloc(1);
-                    uintptr_t *new_page_table = map_temp_page(page_phys_addr);
-
-                    for (uint32_t i = 0; i < 1024; i++) {
-                        new_page_table[i] = 0;
-                    }
-
-                    unmap_temp_page();
-
-                    uintptr_t virt_addr = (uintptr_t) head_block + PAGE_SIZE;
-                    uintptr_t pde = kernel_page_directory[PDE_INDEX(virt_addr)];
-                    uintptr_t *kernel_page_table = map_temp_page(pde);
-
-                    kernel_page_table[PTE_INDEX(virt_addr)] = (page_phys_addr & PAGE_MASK) | PAGE_PRESENT | PAGE_WRITABLE;
-                    allocated_pages++;
-
-                    unmap_temp_page();
-                    invlpg(virt_addr);
-                }
-
                 new_block->free = 0;
-                new_block->size = sizeof(kheap_block_t) + size;
+                new_block->size = block_size;
+                new_block->next = NULL;
+                new_block->prev = tmp;
+                
+                tmp->next = new_block;
+
+                return (void*) ((uintptr_t) new_block + sizeof(kheap_block_t));
+            } else {
+                uintptr_t base_addr = (uintptr_t) tmp + tmp->size;
+                size_t pages = ((base_addr + block_size - last_non_mapped_addr) / PAGE_SIZE) + 1;
+
+                mmap(pages, last_non_mapped_addr);
+
+                kheap_block_t *new_block = (kheap_block_t*) ((uintptr_t) tmp + tmp->size);
+                new_block->free = 0;
+                new_block->size = block_size;
                 new_block->next = NULL;
                 new_block->prev = tmp;
 
                 tmp->next = new_block;
-                return (uintptr_t*) ((uintptr_t) new_block + sizeof(kheap_block_t));
-            }
+                last_non_mapped_addr = (uintptr_t) new_block + (PAGE_SIZE * pages);
 
-            tmp = tmp->next;
+                return (void*) ((uintptr_t) new_block + sizeof(kheap_block_t));
+            }
         }
+
+        tmp = tmp->next;
     }
+
+    return (void*) NULL;
 }

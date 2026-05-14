@@ -28,7 +28,7 @@ struct kheap_block
 typedef struct kheap_block kheap_block_t;
 
 void init_memory_bitmap(unsigned long mbi_addr, unsigned long last_paged_addr, uintptr_t *kernel_page_table_idx);
-uintptr_t* kmalloc(size_t size);
+void* kmalloc(size_t size);
 // void* pmm_alloc(uint32_t npages);
 // void pmm_free(void *addr, uint32_t npages);
 
