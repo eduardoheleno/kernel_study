@@ -206,58 +206,54 @@ static void mmap(size_t pages, uintptr_t base_addr)
     }
 }
 
-void* kmalloc(size_t size)
+static kheap_block_t* alloc_new_block(uintptr_t target_addr, size_t size)
 {
-    // TODO: implement directory mapping
-    // TODO: improve code structure
-    size_t block_size = size + sizeof(kheap_block_t);
+    kheap_block_t *new_block = (kheap_block_t*) target_addr;
+    new_block->free = 0;
+    new_block->size = size;
+    new_block->next = NULL;
+    new_block->prev = NULL;
 
-    if (head_block == NULL) {
-        size_t pages = block_size / PAGE_SIZE;
-        if (block_size % PAGE_SIZE > 0) pages++;
+    return new_block;
+}
 
-        mmap(pages, kernel_heap_start);
+static void* alloc_first_block(size_t size)
+{
+    size_t pages = size / PAGE_SIZE;
+    if (size % PAGE_SIZE > 0) pages++;
 
-        kheap_block_t *new_block = (kheap_block_t*) kernel_heap_start;
-        new_block->free = 0;
-        new_block->size = block_size;
-        new_block->next = NULL;
-        new_block->prev = NULL;
+    mmap(pages, kernel_heap_start);
 
-        head_block = new_block;
-        last_non_mapped_addr = (uintptr_t) new_block + (PAGE_SIZE * pages);
+    kheap_block_t *new_block = alloc_new_block(kernel_heap_start, size);
+    head_block = new_block;
 
-        return (void*) ((uintptr_t) new_block + sizeof(kheap_block_t));
-    }
+    last_non_mapped_addr = (uintptr_t) new_block + (PAGE_SIZE * pages);
 
+    return (void*) ((uintptr_t) new_block + sizeof(kheap_block_t));
+}
+// TODO: check if head_block can be replaced in this context
+static void* alloc_and_push_block(size_t size)
+{
     kheap_block_t *tmp = head_block;
 
     for (;;) {
-        // TODO: check if head_block can be replaced in this context
         if (tmp->next == NULL) {
-            if ((uintptr_t) tmp + tmp->size + block_size < last_non_mapped_addr) {
-                kheap_block_t *new_block = (kheap_block_t*) ((uintptr_t) tmp + tmp->size);
-                new_block->free = 0;
-                new_block->size = block_size;
-                new_block->next = NULL;
+            if ((uintptr_t) tmp + tmp->size + size < last_non_mapped_addr) {
+                kheap_block_t *new_block = alloc_new_block((uintptr_t) tmp + tmp->size, size);
                 new_block->prev = tmp;
-                
                 tmp->next = new_block;
 
                 return (void*) ((uintptr_t) new_block + sizeof(kheap_block_t));
             } else {
                 uintptr_t base_addr = (uintptr_t) tmp + tmp->size;
-                size_t pages = ((base_addr + block_size - last_non_mapped_addr) / PAGE_SIZE) + 1;
+                size_t pages = ((base_addr + size - last_non_mapped_addr) / PAGE_SIZE) + 1;
 
                 mmap(pages, last_non_mapped_addr);
 
-                kheap_block_t *new_block = (kheap_block_t*) ((uintptr_t) tmp + tmp->size);
-                new_block->free = 0;
-                new_block->size = block_size;
-                new_block->next = NULL;
+                kheap_block_t *new_block = alloc_new_block((uintptr_t) tmp + tmp->size, size);
                 new_block->prev = tmp;
-
                 tmp->next = new_block;
+
                 last_non_mapped_addr = (uintptr_t) new_block + (PAGE_SIZE * pages);
 
                 return (void*) ((uintptr_t) new_block + sizeof(kheap_block_t));
@@ -266,6 +262,17 @@ void* kmalloc(size_t size)
 
         tmp = tmp->next;
     }
+}
 
-    return (void*) NULL;
+void* kmalloc(size_t size)
+{
+    // TODO: implement directory mapping
+    // TODO: check if there's an available block before push a new one
+    size_t block_size = size + sizeof(kheap_block_t);
+
+    if (head_block == NULL) {
+        return alloc_first_block(block_size);
+    }
+
+    return alloc_and_push_block(block_size);
 }
