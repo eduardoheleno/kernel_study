@@ -166,20 +166,18 @@ void init_memory_bitmap(unsigned long mbi_addr, unsigned long last_paged_addr, u
     reload_cr3();
 
     // tests
-    uint32_t *ptr1 = kmalloc(4096);
+    uint32_t *ptr1 = kmalloc(100);
     *ptr1 = 10;
 
-    uintptr_t *ptr2 = kmalloc(4096);
-    *ptr2 = 20;
+    // terminal_writeuint(*ptr1);
+    // terminal_writestring("\n");
 
-    uintptr_t *ptr3 = kmalloc(2300);
-    *ptr3 = 30;
+    kfree(ptr1);
 
-    terminal_writeuint(*ptr1);
-    terminal_writestring("\n");
-    terminal_writeuint(*ptr2);
-    terminal_writestring("\n");
-    terminal_writeuint(*ptr3);
+    uint32_t *ptr2 = kmalloc(50);
+
+    kheap_block_t *test = (kheap_block_t*) ((uintptr_t) ptr1 - sizeof(kheap_block_t));
+    terminal_writeuint(test->next->size);
 }
 
 static void mmap(size_t pages, uintptr_t base_addr)
@@ -231,12 +229,29 @@ static void* alloc_first_block(size_t size)
 
     return (void*) ((uintptr_t) new_block + sizeof(kheap_block_t));
 }
-// TODO: check if head_block can be replaced in this context
+
 static void* alloc_and_push_block(size_t size)
 {
     kheap_block_t *tmp = head_block;
 
     for (;;) {
+        if (tmp->free == 1 && size <= tmp->size) {
+            if (size < tmp->size) {
+                kheap_block_t *splitted_block = alloc_new_block((uintptr_t) tmp + size, tmp->size - size);
+                splitted_block->prev = tmp;
+                splitted_block->next = tmp->next;
+
+                tmp->free = 0;
+                tmp->size = size;
+                tmp->next = splitted_block;
+
+                return (void*) ((uintptr_t) tmp + sizeof(kheap_block_t));
+            } else if (size == tmp->size) {
+                tmp->free = 0;
+                return (void*) ((uintptr_t) tmp + sizeof(kheap_block_t));
+            }
+        }
+
         if (tmp->next == NULL) {
             if ((uintptr_t) tmp + tmp->size + size < last_non_mapped_addr) {
                 kheap_block_t *new_block = alloc_new_block((uintptr_t) tmp + tmp->size, size);
@@ -267,7 +282,6 @@ static void* alloc_and_push_block(size_t size)
 void* kmalloc(size_t size)
 {
     // TODO: implement directory mapping
-    // TODO: check if there's an available block before push a new one
     size_t block_size = size + sizeof(kheap_block_t);
 
     if (head_block == NULL) {
@@ -275,4 +289,21 @@ void* kmalloc(size_t size)
     }
 
     return alloc_and_push_block(block_size);
+}
+
+void kfree(void *ptr)
+{
+    // TODO: free pages if not used
+    kheap_block_t *block = (kheap_block_t*) ((uintptr_t) ptr - sizeof(kheap_block_t));
+    block->free = 1;
+
+    if (block->next != NULL && block->next->free == 1) {
+        block->size += block->next->size;
+        block->next = block->next->next;
+    }
+
+    if (block->prev != NULL && block->prev->free == 1) {
+        block->prev->size += block->size;
+        block->prev->next = block->next;
+    }
 }
