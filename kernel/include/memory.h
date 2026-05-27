@@ -48,6 +48,9 @@ static uint16_t slab_classes[] = {
 struct slab
 {
     struct slab *next;
+    struct slab *prev;
+
+    struct slab_cache *cache_owner;
 
     uint16_t total_count;
     uint16_t free_count;
@@ -61,7 +64,11 @@ struct slab_cache
 
     slab_t *partial;
     slab_t *full;
-    slab_t *empty;
+    // In the current state of the allocator its not possible to have an empty
+    // slab, ALL empty slabs are freed.
+    // Maybe the allocator should keep some minimum amount of empty slabs
+    // to prevent virtual mapping.
+    // slab_t *empty;
 };
 typedef struct slab_cache slab_cache_t;
 
