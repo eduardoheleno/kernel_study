@@ -30,7 +30,7 @@ void kernel_main(
 {
 	terminal_initialize();
 
-    init_memory_bitmap(mbi_addr, last_paged_addr, kernel_page_table_idx);
+    init_memory(mbi_addr, last_paged_addr, kernel_page_table_idx);
 
     // uint32_t *test1 = pmm_alloc(1);
     // terminal_writehex((uint32_t) test1);

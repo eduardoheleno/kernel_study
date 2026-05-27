@@ -72,11 +72,8 @@ struct slab_cache
 };
 typedef struct slab_cache slab_cache_t;
 
-void init_memory_bitmap(unsigned long mbi_addr, unsigned long last_paged_addr, uintptr_t *kernel_page_table_idx);
+void init_memory(unsigned long mbi_addr, unsigned long last_paged_addr, uintptr_t *kernel_page_table_idx);
 void* kmalloc(size_t size);
 void kfree(void *ptr);
-// void* pmm_alloc(uint32_t npages);
-// void pmm_free(void *addr, uint32_t npages);
-
 
 #endif

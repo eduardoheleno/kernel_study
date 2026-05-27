@@ -147,7 +147,7 @@ static void pmm_free(void *addr, uint32_t npages)
     }
 }
 
-void init_memory_bitmap(unsigned long mbi_addr, unsigned long last_paged_addr, uintptr_t *kernel_page_table_idx)
+void init_memory(unsigned long mbi_addr, unsigned long last_paged_addr, uintptr_t *kernel_page_table_idx)
 {
     multiboot_info_t *mbi = (multiboot_info_t*) mbi_addr;
     multiboot_memory_map_t *mmap = (multiboot_memory_map_t*) mbi->mmap_addr;
@@ -173,33 +173,6 @@ void init_memory_bitmap(unsigned long mbi_addr, unsigned long last_paged_addr, u
     populate_bitmap(mbi, mmap, kernel_end_addr, last_paged_addr);
     unmap_identity();
     reload_cr3();
-
-    uint16_t *test2 = kmalloc(1024);
-    slab_t *slab = (slab_t*) align_down_4k((uintptr_t) test2);
-    terminal_writeuint(slab->free_count);
-
-    // kfree(test2);
-
-    // terminal_writeuint(slab->free_count);
-
-    // uint8_t *test = (uint8_t*) KHEAP_START;
-    // *test = 12;
-    // terminal_writehex(test);
-
-    // tests
-    // uint32_t *ptr1 = kmalloc(100);
-    // *ptr1 = 10;
-
-    // terminal_writeuint(*ptr1);
-    // terminal_writestring("\n");
-
-    // kfree(ptr1);
-    //
-    // uint32_t *ptr2 = kmalloc(50);
-    // uint32_t *ptr3 = kmalloc(20);
-    //
-    // kheap_block_t *test = (kheap_block_t*) ((uintptr_t) ptr1 - sizeof(kheap_block_t));
-    // terminal_writeuint(test->next->size);
 }
 
 static uint32_t free_virt_area_idx(size_t npages)
@@ -234,7 +207,6 @@ static uintptr_t mmap(size_t npages)
         unmap_temp_page();
 
         uintptr_t base_addr = KHEAP_START + (free_virt_area_tmp * PAGE_SIZE);
-
         if (kernel_page_directory[PDE_INDEX(base_addr)] == 0) {
             uintptr_t page_table_phys_addr = pmm_alloc(1);
             uintptr_t *new_page_table = map_temp_page(page_phys_addr);
@@ -263,20 +235,26 @@ static uintptr_t mmap(size_t npages)
     return KHEAP_START + (free_virt_area_start * PAGE_SIZE);
 }
 
-static void unmmap(uintptr_t virt_addr)
+static void unmmap(uintptr_t virt_addr, size_t npages)
 {
-    uint32_t page_idx = (virt_addr - KHEAP_START) / PAGE_SIZE;
-    uintptr_t pde = kernel_page_directory[PDE_INDEX(virt_addr)];
-    uintptr_t *kernel_page_table = map_temp_page(pde);
+    for (uint32_t i = 0; i < npages; i++) {
+        uint32_t page_idx = (virt_addr - KHEAP_START) / PAGE_SIZE;
+        terminal_writeuint(page_idx);
+        terminal_writestring("\n");
+        uintptr_t pde = kernel_page_directory[PDE_INDEX(virt_addr)];
+        uintptr_t *kernel_page_table = map_temp_page(pde);
 
-    uintptr_t phys_addr = kernel_page_table[PTE_INDEX(virt_addr)] & PAGE_MASK;
-    pmm_free((void*) phys_addr, 1);
+        uintptr_t phys_addr = kernel_page_table[PTE_INDEX(virt_addr)] & PAGE_MASK;
+        pmm_free((void*) phys_addr, 1);
 
-    kernel_page_table[PTE_INDEX(virt_addr)] = 0x0;
-    kheap_pages[page_idx] = 0;
+        kernel_page_table[PTE_INDEX(virt_addr)] = 0x0;
+        kheap_pages[page_idx] = 0;
 
-    unmap_temp_page();
-    invlpg(virt_addr);
+        unmap_temp_page();
+        invlpg(virt_addr);
+
+        virt_addr += PAGE_SIZE;
+    }
 }
 
 static int8_t size_to_class(size_t size)
@@ -290,15 +268,27 @@ static int8_t size_to_class(size_t size)
     return -1;
 }
 
+static void* fp_allocation(size_t size)
+{
+    size_t npages = ((size + sizeof(slab_t)) / PAGE_SIZE) + 1;
+    uintptr_t virt_addr = mmap(npages);
+
+    slab_t *big_slab = (slab_t*) virt_addr;
+    big_slab->total_count = npages;
+    big_slab->cache_owner = NULL;
+
+    return (void*) virt_addr + sizeof(slab_t);
+}
+
 void* kmalloc(size_t size)
 {
     int8_t slab_class_idx = size_to_class(size);
-    slab_cache_t *slab_cache = &slab_caches[slab_class_idx];
+    if (slab_class_idx < 0) return fp_allocation(size);
 
+    slab_cache_t *slab_cache = &slab_caches[slab_class_idx];
     if (slab_cache->partial != NULL) {
         slab_t *slab = slab_cache->partial;
         void *addr = slab->free_list[slab->free_count-- - 1];
-
         if (slab->free_count == 0) {
             if (slab->next != NULL) slab->next->prev = NULL;
             slab_cache->partial = slab->next;
@@ -339,11 +329,16 @@ void* kmalloc(size_t size)
 void kfree(void *ptr)
 {
     slab_t *slab = (slab_t*) align_down_4k((uintptr_t) ptr);
-    slab->free_list[slab->free_count++] = ptr;
+    if (slab->cache_owner == NULL) {
+        unmmap((uintptr_t) slab, slab->total_count);
+        return;
+    }
 
+    slab->free_list[slab->free_count++] = ptr;
     if (slab->free_count == 1) {
         if (slab->prev != NULL) slab->prev->next = slab->next;
         if (slab->next != NULL) slab->next->prev = slab->prev;
+        if (slab->cache_owner->full == slab) slab->cache_owner->full = slab->next;
 
         if (slab->cache_owner->partial != NULL) slab->cache_owner->partial->prev = slab;
         slab->next = slab->cache_owner->partial;
@@ -354,6 +349,6 @@ void kfree(void *ptr)
     if (slab->free_count == slab->total_count) {
         if (slab->prev != NULL) slab->prev->next = slab->next;
         if (slab->next != NULL) slab->next->prev = slab->prev;
-        unmmap((uintptr_t) slab);
+        unmmap((uintptr_t) slab, 1);
     }
 }
