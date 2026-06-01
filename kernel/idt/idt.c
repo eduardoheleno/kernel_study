@@ -10,9 +10,19 @@ extern void irq1_stub(void);
 
 void exception_handler(uint8_t num)
 {
-    terminal_writestring("exception_handler: ");
-    terminal_writeuint(num);
-    terminal_writestring("\n");
+    switch (num)
+    {
+        case 0:
+            terminal_writestring("Divided by 0!\n");
+            break;
+        case 14:
+            terminal_writestring("Page Fault!\n");
+            break;
+        default:
+            terminal_writestring("Exception handler called without error num\n");
+            break;
+    }
+
     __asm__ ("cli; hlt");
 }
 
@@ -32,13 +42,13 @@ void idt_init(void)
     idt.base = (uintptr_t) &idt_entries[0];
     idt.limit = sizeof(idt_entry_t) * 256 - 1;
 
-    for (uint8_t vector = 0; vector < 32; vector++) {
+    for (uint8_t vector = 0; vector < 32; vector++) 
+    {
         idt_set_descriptor(vector, isr_stub_table[vector], 0x8E);
     }
 
     idt_set_descriptor(33, irq1_stub, 0x8E);
-
     __asm__ volatile ("lidt %0" : : "m"(idt));
 
-    terminal_writestring("IDT initialized!\n");
+    terminal_writestring("IDT initialized\n");
 }

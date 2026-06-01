@@ -32,5 +32,5 @@ void gdt_init()
 
     gdt_flush();
 
-    terminal_writestring("GDT initialized!\n");
+    terminal_writestring("GDT initialized\n");
 }

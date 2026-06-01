@@ -27,12 +27,13 @@ void pic_init(int offset1, int offset2)
     outb(PIC1_DATA, 0xFD);
     outb(PIC2_DATA, 0xFF);
 
-    terminal_writestring("PIC initialized!\n");
+    terminal_writestring("PIC initialized\n");
 }
 
 void pic_send_eoi(uint8_t irq)
 {
-    if (irq >= 8) {
+    if (irq >= 8) 
+    {
         outb(PIC2_COMMAND, 0x20);
     }
 

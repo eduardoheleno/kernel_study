@@ -31,7 +31,8 @@ static uint64_t bitmap_size = 0;
 
 static multiboot_memory_map_t* fetch_highest_block(multiboot_info_t *mbi, multiboot_memory_map_t *mmap)
 {
-    for (;;) {
+    for (;;) 
+    {
         if ((uintptr_t) mmap + mmap->size + sizeof(uint32_t) >= mbi->mmap_addr + mbi->mmap_length) break;
         mmap = (multiboot_memory_map_t*) ((uintptr_t) mmap + mmap->size + sizeof(uint32_t));
     }
@@ -41,7 +42,8 @@ static multiboot_memory_map_t* fetch_highest_block(multiboot_info_t *mbi, multib
 
 static void set_used_bitmaps(uint64_t start_index, uint64_t total_used_pages)
 {
-    for (uint64_t i = 0; i < total_used_pages; i++) {
+    for (uint64_t i = 0; i < total_used_pages; i++) 
+    {
         bitmap[start_index] = BITMAP_USED;
         start_index++;
     }
@@ -50,13 +52,16 @@ static void set_used_bitmaps(uint64_t start_index, uint64_t total_used_pages)
 static void populate_bitmap(multiboot_info_t *mbi, multiboot_memory_map_t *mmap, uintptr_t kernel_end_addr, unsigned long last_paged_addr)
 {
     bitmap = (uint8_t*) align_up_4k(last_paged_addr + KERNEL_BASE);
-    for (uint64_t i = 0; i < bitmap_size; i++) {
+    for (uint64_t i = 0; i < bitmap_size; i++) 
+    {
         bitmap[i] = BITMAP_FREE;
     }
 
-    for (;;) {
+    for (;;) 
+    {
         // set used based on GRUB
-        if (mmap->type != MULTIBOOT_MEMORY_AVAILABLE) {
+        if (mmap->type != MULTIBOOT_MEMORY_AVAILABLE) 
+        {
             uint64_t start_index = mmap->addr / PAGE_SIZE;
             uint64_t range_size = (mmap->addr + mmap->len) - mmap->addr;
             uint64_t total_used_pages = range_size / PAGE_SIZE;
@@ -67,7 +72,8 @@ static void populate_bitmap(multiboot_info_t *mbi, multiboot_memory_map_t *mmap,
         multiboot_memory_map_t *next_mmap = (multiboot_memory_map_t*) ((uintptr_t) mmap + mmap->size + sizeof(uint32_t));
         if ((uintptr_t) next_mmap >= mbi->mmap_addr + mbi->mmap_length) break;
 
-        if (mmap->addr + mmap->len < next_mmap->addr) {
+        if (mmap->addr + mmap->len < next_mmap->addr) 
+        {
             // set used based on gap
             uint64_t start_index = (mmap->addr + mmap->len) / PAGE_SIZE;
             uint64_t range_size = next_mmap->addr - (mmap->addr + mmap->len);
@@ -121,16 +127,20 @@ static uintptr_t pmm_alloc(uint32_t npages)
     // TODO: implement check for full physical memory usage
     uint64_t i = 0;
     uint32_t page_accumulator = 0;
-    for (; i < bitmap_size; i++) {
-        if (bitmap[i] != BITMAP_FREE) {
+    for (; i < bitmap_size; i++) 
+    {
+        if (bitmap[i] != BITMAP_FREE) 
+        {
             page_accumulator = 0;
-        } else {
+        } else 
+        {
             page_accumulator++;
             if (page_accumulator == npages) break;
         }
     }
 
-    for (uint64_t j = i - (npages - 1); j <= i; j++) {
+    for (uint64_t j = i - (npages - 1); j <= i; j++) 
+    {
         bitmap[j] = BITMAP_USED;
     }
 
@@ -141,7 +151,8 @@ static void pmm_free(void *addr, uint32_t npages)
 {
     // TODO: implement check for non valid addresses
     uint64_t bitmap_idx = (uintptr_t) addr / PAGE_SIZE;
-    for (uint64_t i = 0; i < npages; i++) {
+    for (uint64_t i = 0; i < npages; i++) 
+    {
         bitmap[bitmap_idx] = BITMAP_FREE;
         bitmap_idx++;
     }
@@ -161,7 +172,8 @@ void init_memory(unsigned long mbi_addr, unsigned long last_paged_addr, uintptr_
     uint64_t bitmap_len = bitmap_size * sizeof(uint8_t);
     uint64_t total_bitmap_pages = bitmap_len / PAGE_SIZE;
 
-    for (uint64_t i = 0; i < total_bitmap_pages; i++) {
+    for (uint64_t i = 0; i < total_bitmap_pages; i++) 
+    {
         *kernel_page_table_idx = kernel_end_addr | PAGE_PRESENT | PAGE_WRITABLE;
 
         kernel_end_addr += PAGE_SIZE;
@@ -173,16 +185,27 @@ void init_memory(unsigned long mbi_addr, unsigned long last_paged_addr, uintptr_
     populate_bitmap(mbi, mmap, kernel_end_addr, last_paged_addr);
     unmap_identity();
     reload_cr3();
+
+    terminal_writestring("Memory initialized\n");
+
+    // uint32_t *test = kmalloc(12);
+    // kfree(test);
+    //
+    // terminal_writeuint(*test);
+    // *test = 12;
 }
 
 static uint32_t free_virt_area_idx(size_t npages)
 {
     uint32_t i = 0;
     uint32_t page_accumulator = 0;
-    for (; i < KHEAP_PAGES_NUM; i++) {
-        if (kheap_pages[i] != 0) {
+    for (; i < KHEAP_PAGES_NUM; i++) 
+    {
+        if (kheap_pages[i] != 0) 
+        {
             page_accumulator = 0;
-        } else {
+        } else 
+        {
             page_accumulator++;
             if (page_accumulator == npages) break;
         }
@@ -196,22 +219,26 @@ static uintptr_t mmap(size_t npages)
     uint32_t free_virt_area_start = free_virt_area_idx(npages);
     uint32_t free_virt_area_tmp = free_virt_area_start;
 
-    for (size_t i = 0; i < npages; i++) {
+    for (size_t i = 0; i < npages; i++) 
+    {
         uintptr_t page_phys_addr = pmm_alloc(1);
         uintptr_t *new_page = map_temp_page(page_phys_addr);
 
-        for (uint32_t i = 0; i < 1024; i++) {
+        for (uint32_t i = 0; i < 1024; i++) 
+        {
             new_page[i] = 0;
         }
 
         unmap_temp_page();
 
         uintptr_t base_addr = KHEAP_START + (free_virt_area_tmp * PAGE_SIZE);
-        if (kernel_page_directory[PDE_INDEX(base_addr)] == 0) {
+        if (kernel_page_directory[PDE_INDEX(base_addr)] == 0) 
+        {
             uintptr_t page_table_phys_addr = pmm_alloc(1);
             uintptr_t *new_page_table = map_temp_page(page_phys_addr);
 
-            for (uint32_t i = 0; i < 1024; i++) {
+            for (uint32_t i = 0; i < 1024; i++) 
+            {
                 new_page_table[i] = 0;
             }
 
@@ -237,10 +264,9 @@ static uintptr_t mmap(size_t npages)
 
 static void unmmap(uintptr_t virt_addr, size_t npages)
 {
-    for (uint32_t i = 0; i < npages; i++) {
+    for (uint32_t i = 0; i < npages; i++) 
+    {
         uint32_t page_idx = (virt_addr - KHEAP_START) / PAGE_SIZE;
-        terminal_writeuint(page_idx);
-        terminal_writestring("\n");
         uintptr_t pde = kernel_page_directory[PDE_INDEX(virt_addr)];
         uintptr_t *kernel_page_table = map_temp_page(pde);
 
@@ -259,8 +285,10 @@ static void unmmap(uintptr_t virt_addr, size_t npages)
 
 static int8_t size_to_class(size_t size)
 {
-    for (uint8_t i = 0; i < NUM_CLASSES; i++) {
-        if (size <= slab_classes[i]) {
+    for (uint8_t i = 0; i < NUM_CLASSES; i++) 
+    {
+        if (size <= slab_classes[i]) 
+        {
             return i;
         }
     }
@@ -286,10 +314,12 @@ void* kmalloc(size_t size)
     if (slab_class_idx < 0) return fp_allocation(size);
 
     slab_cache_t *slab_cache = &slab_caches[slab_class_idx];
-    if (slab_cache->partial != NULL) {
+    if (slab_cache->partial != NULL) 
+    {
         slab_t *slab = slab_cache->partial;
         void *addr = slab->free_list[slab->free_count-- - 1];
-        if (slab->free_count == 0) {
+        if (slab->free_count == 0) 
+        {
             if (slab->next != NULL) slab->next->prev = NULL;
             slab_cache->partial = slab->next;
 
@@ -302,7 +332,8 @@ void* kmalloc(size_t size)
         return addr;
     }
 
-    if (slab_cache->partial == NULL) {
+    if (slab_cache->partial == NULL) 
+    {
         uintptr_t mapped_virt_addr = mmap(1);
         uint16_t total_count = (PAGE_SIZE - sizeof(slab_t)) / slab_cache->obj_size;
 
@@ -314,7 +345,8 @@ void* kmalloc(size_t size)
         new_slab->free_count = total_count;
 
         uintptr_t addr_start = mapped_virt_addr + sizeof(slab_t);
-        for (uint16_t i = 0; i < new_slab->free_count; i++) {
+        for (uint16_t i = 0; i < new_slab->free_count; i++) 
+        {
             new_slab->free_list[i] = (void*) addr_start + (slab_cache->obj_size * i);
         }
 
@@ -329,13 +361,15 @@ void* kmalloc(size_t size)
 void kfree(void *ptr)
 {
     slab_t *slab = (slab_t*) align_down_4k((uintptr_t) ptr);
-    if (slab->cache_owner == NULL) {
+    if (slab->cache_owner == NULL) 
+    {
         unmmap((uintptr_t) slab, slab->total_count);
         return;
     }
 
     slab->free_list[slab->free_count++] = ptr;
-    if (slab->free_count == 1) {
+    if (slab->free_count == 1) 
+    {
         if (slab->prev != NULL) slab->prev->next = slab->next;
         if (slab->next != NULL) slab->next->prev = slab->prev;
         if (slab->cache_owner->full == slab) slab->cache_owner->full = slab->next;
@@ -346,7 +380,8 @@ void kfree(void *ptr)
         slab->cache_owner->partial = slab;
     }
 
-    if (slab->free_count == slab->total_count) {
+    if (slab->free_count == slab->total_count) 
+    {
         if (slab->prev != NULL) slab->prev->next = slab->next;
         if (slab->next != NULL) slab->next->prev = slab->prev;
         unmmap((uintptr_t) slab, 1);

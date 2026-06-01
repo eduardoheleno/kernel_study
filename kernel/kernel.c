@@ -7,7 +7,6 @@
 #include "idt.h"
 #include "memory.h"
 #include "pic.h"
-#include "misc.h"
 
 /* Check if the compiler thinks you are targeting the wrong operating system. */
 #if defined(__linux__)
@@ -29,28 +28,15 @@ void kernel_main(
      ) 
 {
 	terminal_initialize();
+    gdt_init();
+    idt_init();
+    pic_init(0x20, 0x28);
+    __asm__ volatile ("sti");
 
     init_memory(mbi_addr, last_paged_addr, kernel_page_table_idx);
 
-    // uint32_t *test1 = pmm_alloc(1);
-    // terminal_writehex((uint32_t) test1);
-    // terminal_writestring("\n");
-
-    //
-    // uint32_t *test2 = pmm_alloc(2);
-    // terminal_writehex((uint32_t) test2);
-    // terminal_writestring("\n");
-    //
-    // uint32_t *test3 = pmm_alloc(3);
-    // terminal_writehex((uint32_t) test3);
-    // terminal_writestring("\n");
-
-    // gdt_init();
-    // idt_init();
-    // pic_init(0x20, 0x28);
-    // __asm__ volatile ("sti");
-
-    for (;;) {
+    for (;;) 
+    {
         __asm__ volatile ("hlt");
     }
 }
