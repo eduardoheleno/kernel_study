@@ -3,10 +3,12 @@
 #include "pic.h"
 #include "misc.h"
 #include "tty.h"
+#include "timer.h"
 
 #include <stddef.h>
 
-const char *scancodes[] = {
+const char *scancodes[] = 
+{
     NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
     "q", "w", "e", "r", "t", "y", "u", "i", "o", "p",
     NULL, NULL, "\n", NULL,
@@ -23,7 +25,8 @@ uint8_t kybrd_ctrl_read_status()
 
 void kybrd_ctrl_send_cmd(uint8_t cmd)
 {
-    while (1) {
+    while (1) 
+    {
         if ((kybrd_ctrl_read_status() & KYBRD_CTRL_STATS_MASK_IN_BUF) == 0) break;
     }
 
@@ -34,7 +37,15 @@ void keyboard_interrupt_handler(void)
 {
     uint8_t scancode = inb(0x60);
 
-    if ((scancode & 0x80) == 0) {
+    if ((scancode & 0x80) == 0) 
+    {
+        if (*scancodes[scancode] == 't')
+        {
+            terminal_writeuint((uint32_t) uptime_seconds());
+            terminal_writestring("\n");
+            pic_send_eoi(1);
+            return;
+        }
         terminal_writestring(scancodes[scancode]);
     }
 

@@ -49,6 +49,7 @@ void terminal_initialize(void)
 	terminal_row = 0;
 	terminal_column = 0;
 	terminal_color = vga_entry_color(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
+    update_cursor(terminal_column, terminal_row);
 	
 	for (size_t y = 0; y < VGA_HEIGHT; y++) 
     {

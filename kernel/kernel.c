@@ -7,6 +7,8 @@
 #include "idt.h"
 #include "memory.h"
 #include "pic.h"
+#include "timer.h"
+#include "scheduler.h"
 
 /* Check if the compiler thinks you are targeting the wrong operating system. */
 #if defined(__linux__)
@@ -27,10 +29,12 @@ void kernel_main(
         unsigned long mbi_addr
      ) 
 {
+
 	terminal_initialize();
     gdt_init();
     idt_init();
     pic_init(0x20, 0x28);
+    pit_init();
     __asm__ volatile ("sti");
 
     init_memory(mbi_addr, last_paged_addr, kernel_page_table_idx);

@@ -6,6 +6,7 @@ static idt_entry_t idt_entries[256];
 static idt_t idt;
 
 extern void *isr_stub_table[];
+extern void irq0_stub(void);
 extern void irq1_stub(void);
 
 void exception_handler(uint8_t num)
@@ -47,6 +48,7 @@ void idt_init(void)
         idt_set_descriptor(vector, isr_stub_table[vector], 0x8E);
     }
 
+    idt_set_descriptor(32, irq0_stub, 0x8E);
     idt_set_descriptor(33, irq1_stub, 0x8E);
     __asm__ volatile ("lidt %0" : : "m"(idt));
 

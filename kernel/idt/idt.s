@@ -20,6 +20,7 @@ isr_stub_\num:
 .endm
 
 .extern exception_handler
+.extern timer_interrupt_handler
 .extern keyboard_interrupt_handler
 
 isr_no_err_stub 0
@@ -54,6 +55,15 @@ isr_no_err_stub 28
 isr_no_err_stub 29
 isr_err_stub    30
 isr_no_err_stub 31
+
+.globl irq0_stub
+irq0_stub:
+    pusha
+    push %esp
+    call timer_interrupt_handler
+    add $4, %esp
+    popa
+    iret
 
 .globl irq1_stub
 irq1_stub:
