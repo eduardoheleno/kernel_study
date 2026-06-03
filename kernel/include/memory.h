@@ -32,17 +32,6 @@
 
 #define NUM_CLASSES 8
 
-static uint16_t slab_classes[] = {
-    SLAB_16,
-    SLAB_32,
-    SLAB_64,
-    SLAB_128,
-    SLAB_256,
-    SLAB_512,
-    SLAB_1024,
-    SLAB_2048
-};
-
 // TODO: i think that is necessary to map previous too, cause if some middle slab is freed
 // there's no way to attach both sides.
 struct slab

@@ -10,18 +10,29 @@ extern uintptr_t kernel_page_directory[];
 
 static uintptr_t temp_map_addr;
 
+static uint16_t slab_classes[] = {
+    SLAB_16,
+    SLAB_32,
+    SLAB_64,
+    SLAB_128,
+    SLAB_256,
+    SLAB_512,
+    SLAB_1024,
+    SLAB_2048
+};
+
 //TODO: implement bitwise operations to truly use a single bit to control pages
 static uint8_t kheap_pages[KHEAP_PAGES_NUM] = { 0 };
 
 static slab_cache_t slab_caches[] = {
-    { SLAB_16, NULL, NULL, NULL },
-    { SLAB_32, NULL, NULL, NULL },
-    { SLAB_64, NULL, NULL, NULL },
-    { SLAB_128, NULL, NULL, NULL },
-    { SLAB_256, NULL, NULL, NULL },
-    { SLAB_512, NULL, NULL, NULL },
-    { SLAB_1024, NULL, NULL, NULL },
-    { SLAB_2048, NULL, NULL, NULL },
+    { SLAB_16, NULL, NULL },
+    { SLAB_32, NULL, NULL },
+    { SLAB_64, NULL, NULL },
+    { SLAB_128, NULL, NULL },
+    { SLAB_256, NULL, NULL },
+    { SLAB_512, NULL, NULL },
+    { SLAB_1024, NULL, NULL },
+    { SLAB_2048, NULL, NULL },
 };
 
 // TODO: current bitmap is using 8 bytes for every page which is pretty non efficient
@@ -132,7 +143,8 @@ static uintptr_t pmm_alloc(uint32_t npages)
         if (bitmap[i] != BITMAP_FREE) 
         {
             page_accumulator = 0;
-        } else 
+        }
+        else 
         {
             page_accumulator++;
             if (page_accumulator == npages) break;
@@ -204,7 +216,8 @@ static uint32_t free_virt_area_idx(size_t npages)
         if (kheap_pages[i] != 0) 
         {
             page_accumulator = 0;
-        } else 
+        }
+        else 
         {
             page_accumulator++;
             if (page_accumulator == npages) break;
@@ -235,7 +248,7 @@ static uintptr_t mmap(size_t npages)
         if (kernel_page_directory[PDE_INDEX(base_addr)] == 0) 
         {
             uintptr_t page_table_phys_addr = pmm_alloc(1);
-            uintptr_t *new_page_table = map_temp_page(page_phys_addr);
+            uintptr_t *new_page_table = map_temp_page(page_table_phys_addr);
 
             for (uint32_t i = 0; i < 1024; i++) 
             {
@@ -384,6 +397,8 @@ void kfree(void *ptr)
     {
         if (slab->prev != NULL) slab->prev->next = slab->next;
         if (slab->next != NULL) slab->next->prev = slab->prev;
+        if (slab->cache_owner->partial == slab) slab->cache_owner->partial = slab->next;
+
         unmmap((uintptr_t) slab, 1);
     }
 }

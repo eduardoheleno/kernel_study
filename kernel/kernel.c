@@ -22,6 +22,30 @@
 
 // #define MULTIBOOT_BOOTLOADER_MAGIC              0x2BADB002
 
+void test1()
+{
+    for(uint8_t i = 0; i < 10; i++)
+    {
+        terminal_writestring("A");
+    }
+}
+
+void test2()
+{
+    for (uint8_t i = 0; i < 10; i++)
+    {
+        terminal_writestring("B");
+    }
+}
+
+void test3()
+{
+    for (uint8_t i = 0; i < 10; i++)
+    {
+        terminal_writestring("C");
+    }
+}
+
 void kernel_main(
         uintptr_t *kernel_page_table_idx,
         unsigned long last_paged_addr,
@@ -35,9 +59,14 @@ void kernel_main(
     idt_init();
     pic_init(0x20, 0x28);
     pit_init();
-    __asm__ volatile ("sti");
-
     init_memory(mbi_addr, last_paged_addr, kernel_page_table_idx);
+    init_scheduler();
+
+    enqueue_task(&test1);
+    enqueue_task(&test2);
+    enqueue_task(&test3);
+
+    __asm__ volatile ("sti");
 
     for (;;) 
     {

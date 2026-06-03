@@ -23,18 +23,31 @@ typedef struct cpu_state cpu_state_t;
 
 typedef void (task_entry_t)(void);
 
+enum task_status
+{
+    SCHEDULER_IDLE,
+    ENQUEUED,
+    RUNNING,
+    INTERRUPTED,
+    DEAD
+};
+typedef enum task_status task_status_t;
+
 struct task
 {
     cpu_state_t context;
     void *stack_base;
     size_t stack_size;
     task_entry_t *entry;
+
+    task_status_t status;
     
     struct task *next;
 };
 typedef struct task task_t;
 
-void enqueue_task();
+void init_scheduler(void);
+void enqueue_task(void *entry);
 void scheduler_tick(cpu_state_t *state);
 
 #endif

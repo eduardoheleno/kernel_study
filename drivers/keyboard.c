@@ -3,7 +3,7 @@
 #include "pic.h"
 #include "misc.h"
 #include "tty.h"
-#include "timer.h"
+#include "scheduler.h"
 
 #include <stddef.h>
 
@@ -33,6 +33,17 @@ void kybrd_ctrl_send_cmd(uint8_t cmd)
     outb(0x64, cmd);
 }
 
+void test()
+{
+    static uint8_t test = 0;
+    for (uint8_t i = 0; i < 10; i++)
+    {
+        terminal_writeuint(test);
+    }
+
+    test++;
+}
+
 void keyboard_interrupt_handler(void)
 {
     uint8_t scancode = inb(0x60);
@@ -41,8 +52,7 @@ void keyboard_interrupt_handler(void)
     {
         if (*scancodes[scancode] == 't')
         {
-            terminal_writeuint((uint32_t) uptime_seconds());
-            terminal_writestring("\n");
+            enqueue_task(&test);
             pic_send_eoi(1);
             return;
         }
