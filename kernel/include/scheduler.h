@@ -25,16 +25,16 @@ typedef void (task_entry_t)(void);
 
 enum task_status
 {
-    SCHEDULER_IDLE,
-    ENQUEUED,
-    RUNNING,
-    INTERRUPTED,
-    DEAD
+    TASK_SCHEDULER_IDLE,
+    TASK_READY,
+    TASK_RUNNING,
+    TASK_SLEEP,
 };
 typedef enum task_status task_status_t;
 
 struct task
 {
+    uint64_t pid;
     cpu_state_t context;
     void *stack_base;
     size_t stack_size;

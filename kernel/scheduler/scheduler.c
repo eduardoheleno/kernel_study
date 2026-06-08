@@ -1,21 +1,102 @@
 #include "scheduler.h"
 
 #include "memory.h"
-#include "tty.h"
 #include "pic.h"
 #include "timer.h"
+#include "tty.h"
 
-task_t *current_task = NULL;
-task_t *head_task = NULL;
+static task_t *idle_task = NULL;
+static task_t *reaper_task = NULL;
+static task_t *current_task = NULL;
+static task_t *dead_queue = NULL;
+
+static uint64_t task_total = 0;
+static uint64_t next_pid = 0;
 
 extern void restore_task_context(cpu_state_t*);
 
-static void task_trampoline()
+static void wake_idle_task(void)
+{
+    idle_task->status = TASK_SCHEDULER_IDLE;
+}
+
+static void wake_reaper_task(void)
+{
+    reaper_task->status = TASK_READY;
+}
+
+static void sleep_reaper_task(void)
+{
+    reaper_task->status = TASK_SLEEP;
+}
+
+static task_t* next_task(void)
+{
+    task_t *tmp_task = current_task->next;
+    while (tmp_task->status != TASK_READY && tmp_task->status != TASK_SCHEDULER_IDLE)
+    {
+        tmp_task = tmp_task->next;
+    }
+
+    return tmp_task;
+}
+
+static void push_dead_queue(task_t *task)
+{
+    task->next = NULL;
+    if (dead_queue == NULL)
+    {
+        dead_queue = task;
+    }
+    else
+    {
+        task_t *tmp_task = dead_queue;
+        while (tmp_task->next != NULL)
+        {
+            tmp_task = tmp_task->next;
+        }
+
+        tmp_task->next = task;
+    }
+}
+
+static task_t* pop_dead_queue(void)
+{
+    if (dead_queue == NULL) return NULL;
+    task_t *popped_task = dead_queue;
+    dead_queue = dead_queue->next;
+
+    return popped_task;
+}
+
+static void task_exit(void)
+{
+    task_total--;
+    task_t *tmp_task = current_task;
+    while (tmp_task->next != current_task)
+    {
+        tmp_task = tmp_task->next;
+    }
+
+    tmp_task->next = current_task->next;
+
+    task_t *ntask = next_task();
+    push_dead_queue(current_task);
+    wake_reaper_task();
+    current_task = ntask;
+    if (task_total > 0)
+    {
+        current_task->status = TASK_RUNNING;
+    }
+
+    reset_quantum();
+    restore_task_context(&current_task->context);
+}
+
+static void task_trampoline(void)
 {
     current_task->entry();
-
-    current_task->status = DEAD;
-    scheduler_tick(NULL);
+    task_exit();
 }
 
 static task_t* create_task(void *entry)
@@ -31,7 +112,8 @@ static task_t* create_task(void *entry)
     new_task->context.ecx = 0;
     new_task->context.eax = 0;
 
-    new_task->status = ENQUEUED;
+    new_task->pid = next_pid++;
+    new_task->status = TASK_READY;
     new_task->stack_size = PAGE_SIZE;
     new_task->entry = entry;
     new_task->stack_base = task_stack;
@@ -40,32 +122,26 @@ static task_t* create_task(void *entry)
     new_task->context.esp = (uintptr_t) task_stack + PAGE_SIZE;
     new_task->context.eip = (uint32_t) task_trampoline;
 
+    new_task->next = NULL;
+
     return new_task;
 }
 
 void enqueue_task(void *entry)
 {
     task_t *new_task = create_task(entry);
-
-    if (head_task == NULL)
+    task_t * tmp_task = current_task;
+    while (tmp_task->next != current_task)
     {
-        head_task = new_task;
-        new_task->next = head_task;
+        tmp_task = tmp_task->next;
     }
-    else
-    {
-        task_t *tmp_task = head_task;
-        while (tmp_task->next != head_task)
-        {
-            tmp_task = tmp_task->next;
-        }
 
-        tmp_task->next = new_task;
-        new_task->next = head_task;
-    }
+    tmp_task->next = new_task;
+    new_task->next = current_task;
+    task_total++;
 }
 
-void idle_task_loop()
+void idle_task_loop(void)
 {
     for (;;)
     {
@@ -73,90 +149,62 @@ void idle_task_loop()
     }
 }
 
+void reaper_task_loop(void)
+{
+    for (;;)
+    {
+        while (dead_queue != NULL)
+        {
+            task_t *dead_task = pop_dead_queue();
+            kfree(dead_task->stack_base);
+            kfree(dead_task);
+        }
+
+        sleep_reaper_task();
+    }
+}
+
 void init_scheduler(void)
 {
-    task_t *idle_task = create_task(&idle_task_loop);
-    idle_task->status = SCHEDULER_IDLE;
+    idle_task = create_task(&idle_task_loop);
+    idle_task->status = TASK_SCHEDULER_IDLE;
+
+    reaper_task = create_task(&reaper_task_loop);
+    reaper_task->status = TASK_SLEEP;
+
+    idle_task->next = reaper_task;
+    reaper_task->next = idle_task;
+
     current_task = idle_task;
 }
 
 void scheduler_tick(cpu_state_t *state)
 {
-    if (current_task->status == SCHEDULER_IDLE && head_task == NULL)
+    if (task_total == 0)
+    {
+        wake_idle_task();
+    }
+
+    task_t *ntask = next_task();
+    if (ntask == current_task)
     {
         pic_send_eoi(0);
         return;
     }
 
-    if (current_task->status == SCHEDULER_IDLE && head_task != NULL)
+    if (current_task->status == TASK_SCHEDULER_IDLE)
     {
-        kfree(current_task);
-        current_task = head_task;
-        current_task->status = RUNNING;
-        pic_send_eoi(0);
-
-        restore_task_context(&head_task->context);
-        return;
+        current_task->status = TASK_SLEEP;
+    }
+    else
+    {
+        current_task->status = TASK_READY;
+        current_task->context = *state;
+        current_task->context.esp = (uint32_t) state + 44;
     }
 
-    if (current_task->status == DEAD)
-    {
-        task_t *tmp_task = head_task;
-        while (tmp_task->next != current_task)
-        {
-            tmp_task = tmp_task->next;
-        }
-
-        if (tmp_task == current_task)
-        {
-            // TODO: insert task stack in some "to free" list
-            // kfree(current_task->stack_base);
-            kfree(current_task);
-            head_task = NULL;
-
-            task_t *idle_task = create_task(&idle_task_loop);
-            idle_task->status = SCHEDULER_IDLE;
-            current_task = idle_task;
-
-            reset_quantum();
-            pic_send_eoi(0);
-            restore_task_context(&current_task->context);
-            return;
-        }
-
-        tmp_task->next = current_task->next;
-        if (current_task == head_task)
-        {
-            head_task = current_task->next;
-        }
-
-        task_t *next_task = current_task->next;
-        // TODO: insert task stack in some "to free" list
-        // kfree(current_task->stack_base);
-        kfree(current_task);
-
-        current_task = next_task;
-        current_task->status = RUNNING;
-
-        reset_quantum();
-        pic_send_eoi(0);
-        restore_task_context(&current_task->context);
-        return;
-    }
-
-    if (current_task->next == current_task)
-    {
-        pic_send_eoi(0);
-        return;
-    }
-
-    current_task->context = *state;
-    current_task->context.esp = (uint32_t) state + 44;
-    current_task->status = INTERRUPTED;
-
-    current_task = current_task->next;
-    current_task->status = RUNNING;
-
+    current_task = ntask;
+    current_task->status = TASK_RUNNING;
     pic_send_eoi(0);
     restore_task_context(&current_task->context);
 }

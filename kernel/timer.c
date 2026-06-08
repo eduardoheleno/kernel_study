@@ -3,7 +3,6 @@
 #include "pic.h"
 #include "misc.h"
 #include "scheduler.h"
-#include "tty.h"
 
 static volatile uint64_t ticks = 0;
 static uint8_t quantum_tick = 0;
