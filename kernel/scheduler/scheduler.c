@@ -3,6 +3,7 @@
 #include "memory.h"
 #include "pic.h"
 #include "timer.h"
+#include "misc.h"
 #include "tty.h"
 
 static task_t *idle_task = NULL;
@@ -71,6 +72,8 @@ static task_t* pop_dead_queue(void)
 
 static void task_exit(void)
 {
+    disable_interrupts();
+
     task_total--;
     task_t *tmp_task = current_task;
     while (tmp_task->next != current_task)
@@ -88,6 +91,8 @@ static void task_exit(void)
     {
         current_task->status = TASK_RUNNING;
     }
+
+    enable_interrupts();
 
     reset_quantum();
     restore_task_context(&current_task->context);
@@ -145,7 +150,7 @@ void idle_task_loop(void)
 {
     for (;;)
     {
-        __asm__ volatile ("hlt");
+        halt();
     }
 }
 

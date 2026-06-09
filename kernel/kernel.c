@@ -9,6 +9,7 @@
 #include "pic.h"
 #include "timer.h"
 #include "scheduler.h"
+#include "misc.h"
 
 /* Check if the compiler thinks you are targeting the wrong operating system. */
 #if defined(__linux__)
@@ -66,10 +67,10 @@ void kernel_main(
     enqueue_task(&test2);
     enqueue_task(&test3);
 
-    __asm__ volatile ("sti");
+    enable_interrupts();
 
     for (;;) 
     {
-        __asm__ volatile ("hlt");
+        halt();
     }
 }

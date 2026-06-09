@@ -5,7 +5,7 @@
 
 extern void gdt_flush(void);
 
-static gdt_entry_t gdt_entries[3];
+static gdt_entry_t gdt_entries[5];
 gdt_t gdt;
 
 static void gdt_set_gate(int num, unsigned long base, unsigned long limit, unsigned char access, unsigned char gran)
@@ -23,12 +23,14 @@ static void gdt_set_gate(int num, unsigned long base, unsigned long limit, unsig
 
 void gdt_init()
 {
-    gdt.limit = (sizeof(gdt_entry_t) * 3) - 1;
+    gdt.limit = (sizeof(gdt_entry_t) * 5) - 1;
     gdt.base = (uintptr_t) gdt_entries;
 
     gdt_set_gate(0, 0, 0, 0, 0);
     gdt_set_gate(1, 0, 0xFFFFFFFF, 0x9A, 0xCF);
     gdt_set_gate(2, 0, 0xFFFFFFFF, 0x92, 0xCF);
+    gdt_set_gate(3, 0, 0xFFFFFFFF, 0xF2, 0xCF);
+    gdt_set_gate(4, 0, 0xFFFFFFFF, 0xFA, 0xCF);
 
     gdt_flush();
 

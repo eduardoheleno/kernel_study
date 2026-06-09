@@ -13,6 +13,21 @@ static inline uintptr_t align_down_4k(uintptr_t addr)
     return addr & ~0xFFF;
 }
 
+static inline void disable_interrupts(void)
+{
+    __asm__ volatile ("cli");
+}
+
+static inline void enable_interrupts(void)
+{
+    __asm__ volatile ("sti");
+}
+
+static inline void halt(void)
+{
+    __asm__ volatile ("hlt");
+}
+
 static inline void outb(uint16_t port, uint8_t val)
 {
     __asm__ volatile ("outb %b0, %w1" : : "a"(val), "Nd"(port) : "memory");
