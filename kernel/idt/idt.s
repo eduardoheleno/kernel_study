@@ -22,6 +22,7 @@ isr_stub_\num:
 .extern exception_handler
 .extern timer_interrupt_handler
 .extern keyboard_interrupt_handler
+.extern syscall_handler
 
 isr_no_err_stub 0
 isr_no_err_stub 1
@@ -59,9 +60,16 @@ isr_no_err_stub 31
 .globl irq0_stub
 irq0_stub:
     pusha
+
+    xorl %eax, %eax
+    movw %ds, %ax
+    pushl %eax
+
     push %esp
+
     call timer_interrupt_handler
-    add $4, %esp
+
+    add $8, %esp
     popa
     iret
 
@@ -69,6 +77,43 @@ irq0_stub:
 irq1_stub:
     pusha
     call keyboard_interrupt_handler
+    popa
+    iret
+
+.globl syscall_stub
+syscall_stub:
+    pusha
+
+    xorl %eax, %eax
+    movw %ds, %ax
+    pushl %eax
+    movw %es, %ax
+    pushl %eax
+    movw %fs, %ax
+    pushl %eax
+    movw %gs, %ax
+    pushl %eax
+
+    movw $0x10, %ax
+    movw %ax, %ds
+    movw %ax, %es
+    movw %ax, %fs
+    movw %ax, %gs
+
+    leal 12(%esp), %eax
+    pushl %eax
+    call syscall_handler
+    addl $4, %esp
+
+    popl %eax
+    movw %ax, %gs
+    popl %eax
+    movw %ax, %fs
+    popl %eax
+    movw %ax, %es
+    popl %eax
+    movw %ax, %ds
+
     popa
     iret
 

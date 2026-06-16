@@ -52,7 +52,7 @@ void keyboard_interrupt_handler(void)
     {
         if (*scancodes[scancode] == 't')
         {
-            enqueue_task(&test);
+            enqueue_task(&test, RING0_TASK);
             pic_send_eoi(1);
             return;
         }

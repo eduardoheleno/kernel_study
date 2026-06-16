@@ -6,18 +6,11 @@
 
 struct cpu_state
 {
-    uint32_t edi;
-    uint32_t esi;
-    uint32_t ebp;
-    uint32_t esp;
-    uint32_t ebx;
-    uint32_t edx;
-    uint32_t ecx;
-    uint32_t eax;
-
-    uint32_t eip;
-    uint32_t cs;
-    uint32_t eflags;
+    uint32_t ds;
+    uint32_t edi, esi, ebp, esp, ebx, edx, ecx, eax;
+    uint32_t eip, cs, eflags;
+    uint32_t useresp;
+    uint32_t userss;
 };
 typedef struct cpu_state cpu_state_t;
 
@@ -32,22 +25,35 @@ enum task_status
 };
 typedef enum task_status task_status_t;
 
+enum task_type
+{
+    RING0_TASK,
+    RING3_TASK
+};
+typedef enum task_type task_type_t;
+
 struct task
 {
     uint64_t pid;
     cpu_state_t context;
-    void *stack_base;
-    size_t stack_size;
-    task_entry_t *entry;
+    uintptr_t cr3;
 
+    void *ring0_stack_base;
+    size_t ring0_stack_size;
+
+    void *ring3_stack_base;
+    size_t ring3_stack_size;
+
+    task_entry_t *entry;
     task_status_t status;
-    
+    task_type_t type;
     struct task *next;
 };
 typedef struct task task_t;
 
 void init_scheduler(void);
-void enqueue_task(void *entry);
+void enqueue_task(void *entry, task_type_t type);
 void scheduler_tick(cpu_state_t *state);
+void task_exit(void);
 
 #endif

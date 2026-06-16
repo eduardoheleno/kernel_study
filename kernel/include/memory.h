@@ -8,29 +8,33 @@
 #define KHEAP_START   0xC0400000
 #define KHEAP_END     0xE0000000
 
+#define USER_CODE     0x00001000
+#define USER_STACK    0x00002000
+
 #define PAGE_MASK     0xFFFFF000
 #define PAGE_PRESENT  0x001
 #define PAGE_WRITABLE 0x002
+#define PAGE_USER     0x004
 #define PAGE_SIZE     4096
 
-#define BITMAP_USED 1
-#define BITMAP_FREE 0
+#define BITMAP_USED   1
+#define BITMAP_FREE   0
 
 #define PDE_INDEX(addr) (((addr) >> 22) & 0x3FF)
 #define PTE_INDEX(addr) (((addr) >> 12) & 0x3FF)
 
 #define KHEAP_PAGES_NUM (KHEAP_END - KHEAP_START) / PAGE_SIZE
 
-#define SLAB_16   16
-#define SLAB_32   32
-#define SLAB_64   64
-#define SLAB_128  128
-#define SLAB_256  256
-#define SLAB_512  512
-#define SLAB_1024 1024
-#define SLAB_2048 2048
+#define SLAB_16       16
+#define SLAB_32       32
+#define SLAB_64       64
+#define SLAB_128      128
+#define SLAB_256      256
+#define SLAB_512      512
+#define SLAB_1024     1024
+#define SLAB_2048     2048
 
-#define NUM_CLASSES 8
+#define NUM_CLASSES   8
 
 // TODO: i think that is necessary to map previous too, cause if some middle slab is freed
 // there's no way to attach both sides.
@@ -62,7 +66,14 @@ struct slab_cache
 typedef struct slab_cache slab_cache_t;
 
 void init_memory(unsigned long mbi_addr, unsigned long last_paged_addr, uintptr_t *kernel_page_table_idx);
+
+uintptr_t pmm_alloc(uint32_t npages);
+uintptr_t* map_temp_page(uintptr_t phys_addr);
+void unmap_temp_page(void);
+
 void* kmalloc(size_t size);
 void kfree(void *ptr);
+
+uintptr_t mmap_ring3(void);
 
 #endif

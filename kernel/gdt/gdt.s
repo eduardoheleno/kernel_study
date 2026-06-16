@@ -1,4 +1,6 @@
 .globl gdt_flush
+.globl tss_flush
+
 .extern gdt
 
 gdt_flush:
@@ -10,6 +12,11 @@ gdt_flush:
     movw %ax, %gs
     movw %ax, %ss
     ljmp $0x08, $flush2
+
+tss_flush:
+    movw $0x28, %ax
+    ltr %ax
+    ret
 
 flush2:
     ret

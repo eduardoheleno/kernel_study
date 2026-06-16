@@ -3,6 +3,9 @@
 
 #include <stdint.h>
 
+// syscalls
+#define TASK_EXIT 1
+
 struct idt_entry
 {
 	uint16_t    isr_low;

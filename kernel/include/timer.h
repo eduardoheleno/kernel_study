@@ -3,9 +3,9 @@
 
 #include <stdint.h>
 
-#define PIT_BASE_FREQ 1193182
-// #define PIT_HZ 100
-#define PIT_HZ 0.0005
+#define PIT_BASE_FREQ     1193182
+// #define PIT_HZ         100
+#define PIT_HZ            0.0005
 
 #define SCHEDULER_QUANTUM 5
 

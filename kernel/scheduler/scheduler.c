@@ -3,6 +3,7 @@
 #include "memory.h"
 #include "pic.h"
 #include "timer.h"
+#include "gdt.h"
 #include "misc.h"
 #include "tty.h"
 
@@ -14,6 +15,8 @@ static task_t *dead_queue = NULL;
 static uint64_t task_total = 0;
 static uint64_t next_pid = 0;
 
+extern tss_t tss;
+extern uintptr_t kernel_page_directory[];
 extern void restore_task_context(cpu_state_t*);
 
 static void wake_idle_task(void)
@@ -70,11 +73,15 @@ static task_t* pop_dead_queue(void)
     return popped_task;
 }
 
-static void task_exit(void)
+void task_exit(void)
 {
     disable_interrupts();
 
-    task_total--;
+    if (--task_total == 0)
+    {
+        wake_idle_task();
+    }
+
     task_t *tmp_task = current_task;
     while (tmp_task->next != current_task)
     {
@@ -92,9 +99,9 @@ static void task_exit(void)
         current_task->status = TASK_RUNNING;
     }
 
-    enable_interrupts();
-
     reset_quantum();
+    tss.esp0 = (uint32_t)current_task->ring0_stack_base + PAGE_SIZE;
+    load_cr3(current_task->cr3);
     restore_task_context(&current_task->context);
 }
 
@@ -104,10 +111,9 @@ static void task_trampoline(void)
     task_exit();
 }
 
-static task_t* create_task(void *entry)
+static task_t* create_task(void *entry, task_type_t type)
 {
     task_t *new_task = kmalloc(sizeof(task_t));
-    void *task_stack = kmalloc(PAGE_SIZE);
 
     new_task->context.edi = 0;
     new_task->context.esi = 0;
@@ -119,23 +125,43 @@ static task_t* create_task(void *entry)
 
     new_task->pid = next_pid++;
     new_task->status = TASK_READY;
-    new_task->stack_size = PAGE_SIZE;
-    new_task->entry = entry;
-    new_task->stack_base = task_stack;
-    new_task->context.cs = 0x08;
+    new_task->type = type;
     new_task->context.eflags = 0x202;
-    new_task->context.esp = (uintptr_t) task_stack + PAGE_SIZE;
-    new_task->context.eip = (uint32_t) task_trampoline;
+
+    void *kernel_stack = kmalloc(PAGE_SIZE);
+    new_task->ring0_stack_base = kernel_stack;
+    new_task->ring0_stack_size = PAGE_SIZE;
+
+    switch (type)
+    {
+        case RING0_TASK:
+            new_task->context.cs = KERNEL_CS;
+            new_task->context.ds = KERNEL_DS;
+            new_task->cr3 = (uintptr_t)kernel_page_directory - KERNEL_BASE;
+            new_task->entry = entry;
+            new_task->context.esp = (uintptr_t)kernel_stack + PAGE_SIZE;
+            new_task->context.eip = (uint32_t)task_trampoline;
+            break;
+        case RING3_TASK:
+            new_task->context.cs = USER_CS;
+            new_task->context.ds = USER_DS;
+            new_task->cr3 = mmap_ring3();
+            new_task->ring3_stack_base = (void*)USER_STACK;
+            new_task->ring3_stack_size = PAGE_SIZE;
+            new_task->context.esp = (uintptr_t)USER_STACK + PAGE_SIZE;
+            new_task->context.eip = (uint32_t)USER_CODE;
+            break;
+    }
 
     new_task->next = NULL;
 
     return new_task;
 }
 
-void enqueue_task(void *entry)
+void enqueue_task(void *entry, task_type_t type)
 {
-    task_t *new_task = create_task(entry);
-    task_t * tmp_task = current_task;
+    task_t *new_task = create_task(entry, type);
+    task_t *tmp_task = current_task;
     while (tmp_task->next != current_task)
     {
         tmp_task = tmp_task->next;
@@ -160,9 +186,14 @@ void reaper_task_loop(void)
     {
         while (dead_queue != NULL)
         {
+            disable_interrupts();
+
             task_t *dead_task = pop_dead_queue();
-            kfree(dead_task->stack_base);
+            // TODO: free ring3 stack
+            kfree(dead_task->ring0_stack_base);
             kfree(dead_task);
+
+            enable_interrupts();
         }
 
         sleep_reaper_task();
@@ -171,10 +202,10 @@ void reaper_task_loop(void)
 
 void init_scheduler(void)
 {
-    idle_task = create_task(&idle_task_loop);
+    idle_task = create_task(&idle_task_loop, RING0_TASK);
     idle_task->status = TASK_SCHEDULER_IDLE;
 
-    reaper_task = create_task(&reaper_task_loop);
+    reaper_task = create_task(&reaper_task_loop, RING0_TASK);
     reaper_task->status = TASK_SLEEP;
 
     idle_task->next = reaper_task;
@@ -190,6 +221,24 @@ void scheduler_tick(cpu_state_t *state)
         wake_idle_task();
     }
 
+    if (current_task->status == TASK_SCHEDULER_IDLE)
+    {
+        current_task->status = TASK_SLEEP;
+    }
+    else
+    {
+        if (current_task->context.cs == USER_CS)
+        {
+            current_task->context.esp = state->useresp;
+        }
+        else
+        {
+            current_task->context.esp = (uint32_t)&state->useresp;
+        }
+        current_task->status = TASK_READY;
+        current_task->context = *state;
+    }
+
     task_t *ntask = next_task();
     if (ntask == current_task)
     {
@@ -197,19 +246,11 @@ void scheduler_tick(cpu_state_t *state)
         return;
     }
 
-    if (current_task->status == TASK_SCHEDULER_IDLE)
-    {
-        current_task->status = TASK_SLEEP;
-    }
-    else
-    {
-        current_task->status = TASK_READY;
-        current_task->context = *state;
-        current_task->context.esp = (uint32_t) state + 44;
-    }
-
     current_task = ntask;
     current_task->status = TASK_RUNNING;
+
+    tss.esp0 = (uint32_t)current_task->ring0_stack_base + PAGE_SIZE;
+    load_cr3(current_task->cr3);
     pic_send_eoi(0);
     restore_task_context(&current_task->context);
 }

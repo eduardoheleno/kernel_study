@@ -47,14 +47,14 @@ void test3()
     }
 }
 
+// TODO: improve code organization
 void kernel_main(
         uintptr_t *kernel_page_table_idx,
         unsigned long last_paged_addr,
         unsigned long magic,
         unsigned long mbi_addr
-     ) 
+     )
 {
-
 	terminal_initialize();
     gdt_init();
     idt_init();
@@ -62,12 +62,13 @@ void kernel_main(
     pit_init();
     init_memory(mbi_addr, last_paged_addr, kernel_page_table_idx);
     init_scheduler();
-
-    enqueue_task(&test1);
-    enqueue_task(&test2);
-    enqueue_task(&test3);
-
     enable_interrupts();
+
+    enqueue_task(NULL, RING3_TASK);
+
+    enqueue_task(&test1, RING0_TASK);
+    enqueue_task(&test2, RING0_TASK);
+    enqueue_task(&test3, RING0_TASK);
 
     for (;;) 
     {

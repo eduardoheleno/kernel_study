@@ -4,9 +4,12 @@
 #include <stdint.h>
 
 extern void gdt_flush(void);
+extern void tss_flush(void);
 
-static gdt_entry_t gdt_entries[5];
+static gdt_entry_t gdt_entries[6];
+
 gdt_t gdt;
+tss_t tss;
 
 static void gdt_set_gate(int num, unsigned long base, unsigned long limit, unsigned char access, unsigned char gran)
 {
@@ -23,16 +26,21 @@ static void gdt_set_gate(int num, unsigned long base, unsigned long limit, unsig
 
 void gdt_init()
 {
-    gdt.limit = (sizeof(gdt_entry_t) * 5) - 1;
-    gdt.base = (uintptr_t) gdt_entries;
+    gdt.limit = (sizeof(gdt_entry_t) * 6) - 1;
+    gdt.base = (uintptr_t)gdt_entries;
+
+    tss.ss0 = 0x10;
+    tss.iomap_base = sizeof(tss_t);
 
     gdt_set_gate(0, 0, 0, 0, 0);
     gdt_set_gate(1, 0, 0xFFFFFFFF, 0x9A, 0xCF);
     gdt_set_gate(2, 0, 0xFFFFFFFF, 0x92, 0xCF);
     gdt_set_gate(3, 0, 0xFFFFFFFF, 0xF2, 0xCF);
     gdt_set_gate(4, 0, 0xFFFFFFFF, 0xFA, 0xCF);
+    gdt_set_gate(5, (uintptr_t) &tss, sizeof(tss_t) - 1, 0x89, 0x0);
 
     gdt_flush();
+    tss_flush();
 
     terminal_writestring("GDT initialized\n");
 }
