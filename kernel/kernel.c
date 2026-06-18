@@ -25,6 +25,9 @@
 
 void test1()
 {
+    volatile uint8_t test = *(volatile uint8_t *)(uintptr_t)0xFFFFFFFF;
+    (void)test;
+
     for(uint8_t i = 0; i < 10; i++)
     {
         terminal_writestring("A");
@@ -66,7 +69,7 @@ void kernel_main(
 
     enqueue_task(NULL, RING3_TASK);
 
-    enqueue_task(&test1, RING0_TASK);
+    // enqueue_task(&test1, RING0_TASK);
     enqueue_task(&test2, RING0_TASK);
     enqueue_task(&test3, RING0_TASK);
 

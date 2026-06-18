@@ -2,10 +2,10 @@
 isr_stub_\num:
     pusha
     push $\num
+    push %esp
     call exception_handler
-    add $4, %esp
+    add $8, %esp
     popa
-    add $4, %esp
     iret
 .endm
 

@@ -68,12 +68,13 @@ typedef struct slab_cache slab_cache_t;
 void init_memory(unsigned long mbi_addr, unsigned long last_paged_addr, uintptr_t *kernel_page_table_idx);
 
 uintptr_t pmm_alloc(uint32_t npages);
-uintptr_t* map_temp_page(uintptr_t phys_addr);
-void unmap_temp_page(void);
+uintptr_t* map_tmp_page(uintptr_t phys_addr);
+void unmap_tmp_page(void);
 
 void* kmalloc(size_t size);
 void kfree(void *ptr);
 
 uintptr_t mmap_ring3(void);
+void unmmap_ring3(uintptr_t page_directory_phys_addr);
 
 #endif

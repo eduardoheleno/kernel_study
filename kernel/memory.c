@@ -8,7 +8,7 @@
 extern char _kernel_start;
 extern uintptr_t kernel_page_directory[];
 
-static uintptr_t temp_map_addr;
+static uintptr_t tmp_map_addr;
 
 static uint16_t slab_classes[] = {
     SLAB_16,
@@ -111,26 +111,26 @@ static void unmap_identity()
     );
 }
 
-uintptr_t* map_temp_page(uintptr_t phys_addr)
+uintptr_t* map_tmp_page(uintptr_t phys_addr)
 {
-    uintptr_t pde = kernel_page_directory[PDE_INDEX(temp_map_addr)];
-    uint32_t *temp_page_table = (uint32_t*)((pde & PAGE_MASK) + KERNEL_BASE);
+    uintptr_t pde = kernel_page_directory[PDE_INDEX(tmp_map_addr)];
+    uint32_t *tmp_page_table = (uint32_t*)((pde & PAGE_MASK) + KERNEL_BASE);
  
-    temp_page_table[PTE_INDEX(temp_map_addr)] = (phys_addr & PAGE_MASK) | PAGE_PRESENT | PAGE_WRITABLE;
+    tmp_page_table[PTE_INDEX(tmp_map_addr)] = (phys_addr & PAGE_MASK) | PAGE_PRESENT | PAGE_WRITABLE;
 
-    invlpg(temp_map_addr);
+    invlpg(tmp_map_addr);
 
-    return (uintptr_t*)temp_map_addr;
+    return (uintptr_t*)tmp_map_addr;
 }
 
-void unmap_temp_page(void)
+void unmap_tmp_page(void)
 {
-    uintptr_t pde = kernel_page_directory[PDE_INDEX(temp_map_addr)];
-    uint32_t *temp_page_table = (uint32_t*)((pde & PAGE_MASK) + KERNEL_BASE);
+    uintptr_t pde = kernel_page_directory[PDE_INDEX(tmp_map_addr)];
+    uint32_t *tmp_page_table = (uint32_t*)((pde & PAGE_MASK) + KERNEL_BASE);
  
-    temp_page_table[PTE_INDEX(temp_map_addr)] = 0x0;
+    tmp_page_table[PTE_INDEX(tmp_map_addr)] = 0x0;
 
-    invlpg(temp_map_addr);
+    invlpg(tmp_map_addr);
 }
 
 uintptr_t pmm_alloc(uint32_t npages)
@@ -192,7 +192,7 @@ void init_memory(unsigned long mbi_addr, unsigned long last_paged_addr, uintptr_
         kernel_page_table_idx++;
     }
 
-    temp_map_addr = kernel_end_addr + KERNEL_BASE;
+    tmp_map_addr = kernel_end_addr + KERNEL_BASE;
 
     populate_bitmap(mbi, mmap, kernel_end_addr, last_paged_addr);
     unmap_identity();
@@ -229,34 +229,34 @@ static uintptr_t mmap(size_t npages, uint8_t flags)
     for (size_t i = 0; i < npages; i++) 
     {
         uintptr_t page_phys_addr = pmm_alloc(1);
-        uintptr_t *new_page = map_temp_page(page_phys_addr);
+        uintptr_t *new_page = map_tmp_page(page_phys_addr);
         for (uint32_t i = 0; i < 1024; i++) 
         {
             new_page[i] = 0x0;
         }
-        unmap_temp_page();
+        unmap_tmp_page();
 
         uintptr_t base_addr = KHEAP_START + (free_virt_area_tmp * PAGE_SIZE);
         if (kernel_page_directory[PDE_INDEX(base_addr)] == 0) 
         {
             uintptr_t page_table_phys_addr = pmm_alloc(1);
-            uintptr_t *new_page_table = map_temp_page(page_table_phys_addr);
+            uintptr_t *new_page_table = map_tmp_page(page_table_phys_addr);
 
             for (uint32_t i = 0; i < 1024; i++) 
             {
                 new_page_table[i] = 0x0;
             }
-            unmap_temp_page();
+            unmap_tmp_page();
 
             kernel_page_directory[PDE_INDEX(base_addr)] = (page_table_phys_addr & PAGE_MASK) | flags;
         }
 
         uintptr_t pde = kernel_page_directory[PDE_INDEX(base_addr)];
-        uintptr_t *kernel_page_table = map_temp_page(pde);
+        uintptr_t *kernel_page_table = map_tmp_page(pde);
 
         kernel_page_table[PTE_INDEX(base_addr)] = (page_phys_addr & PAGE_MASK) | flags;
 
-        unmap_temp_page();
+        unmap_tmp_page();
         invlpg(base_addr);
 
         kheap_pages[free_virt_area_tmp] = 1;
@@ -272,7 +272,7 @@ static void unmmap(uintptr_t virt_addr, size_t npages)
     {
         uint32_t page_idx = (virt_addr - KHEAP_START) / PAGE_SIZE;
         uintptr_t pde = kernel_page_directory[PDE_INDEX(virt_addr)];
-        uintptr_t *kernel_page_table = map_temp_page(pde);
+        uintptr_t *kernel_page_table = map_tmp_page(pde);
 
         uintptr_t phys_addr = kernel_page_table[PTE_INDEX(virt_addr)] & PAGE_MASK;
         pmm_free((void*) phys_addr, 1);
@@ -280,7 +280,7 @@ static void unmmap(uintptr_t virt_addr, size_t npages)
         kernel_page_table[PTE_INDEX(virt_addr)] = 0x0;
         kheap_pages[page_idx] = 0;
 
-        unmap_temp_page();
+        unmap_tmp_page();
         invlpg(virt_addr);
 
         virt_addr += PAGE_SIZE;
@@ -290,72 +290,82 @@ static void unmmap(uintptr_t virt_addr, size_t npages)
 uintptr_t mmap_ring3(void)
 {
     uintptr_t page_table_entry_phys_addr1 = pmm_alloc(1);
-    uintptr_t *temp_virt_page_table_entry1 = map_temp_page(page_table_entry_phys_addr1);
+    uintptr_t *tmp_virt_page_table_entry1 = map_tmp_page(page_table_entry_phys_addr1);
     for (uint16_t i = 0; i < 1024; i++)
     {
-        temp_virt_page_table_entry1[i] = 0x0;
+        tmp_virt_page_table_entry1[i] = 0x0;
     }
 
-    uint8_t *user_code_virt_addr = (uint8_t*)temp_virt_page_table_entry1;
+    uint8_t *user_code_virt_addr = (uint8_t*)tmp_virt_page_table_entry1;
     // uint8_t user_code[] = {
-    //     0xB8, 0x01, 0x00, 0x00, 0x00,
-    //     0xCD, 0x80,
-    //     0xEB, 0xF7
-    // };
-    // uint8_t user_code[] = {
-    //     0xB8, 0x01, 0x00, 0x00, 0x00, // mov $1, %eax
+    //     0xB8, 0x02, 0x00, 0x00, 0x00, // mov $2, %eax     ; TEST syscall = 2
     //     0xCD, 0x80,                   // int $0x80
-    //     0xEB, 0xFE                    // jmp .
+    //
+    //     0xB8, 0x01, 0x00, 0x00, 0x00, // mov $1, %eax     ; TASK_EXIT = 1
+    //     0xCD, 0x80,                   // int $0x80
+    //
+    //     0xEB, 0xFE                    // jmp .            ; se exit retornar, trava
     // };
     uint8_t user_code[] = {
-        0xB8, 0x02, 0x00, 0x00, 0x00, // mov $2, %eax     ; TEST syscall = 2
-        0xCD, 0x80,                   // int $0x80
-
-        0xB8, 0x01, 0x00, 0x00, 0x00, // mov $1, %eax     ; TASK_EXIT = 1
-        0xCD, 0x80,                   // int $0x80
-
-        0xEB, 0xFE                    // jmp .            ; se exit retornar, trava
+        0xA1, 0x00, 0x00, 0x90, 0x00, // mov 0x00900000, %eax
+        0xEB, 0xFE                    // jmp .
     };
     for (uint16_t i = 0; i < sizeof(user_code); i++)
     {
         user_code_virt_addr[i] = user_code[i];
     }
-
-    unmap_temp_page();
+    unmap_tmp_page();
 
     uintptr_t page_table_entry_phys_addr2 = pmm_alloc(1);
-    uintptr_t *temp_virt_page_table_entry2 = map_temp_page(page_table_entry_phys_addr2);
+    uintptr_t *tmp_virt_page_table_entry2 = map_tmp_page(page_table_entry_phys_addr2);
     for (uint16_t i = 0; i < 1024; i++)
     {
-        temp_virt_page_table_entry2[i] = 0x0;
+        tmp_virt_page_table_entry2[i] = 0x0;
     }
-    unmap_temp_page();
+    unmap_tmp_page();
 
     uintptr_t page_table_phys_addr = pmm_alloc(1);
-    uintptr_t *temp_virt_page_table = map_temp_page(page_table_phys_addr);
+    uintptr_t *tmp_virt_page_table = map_tmp_page(page_table_phys_addr);
     for (uint16_t i = 0; i < 1024; i++)
     {
-        temp_virt_page_table[i] = 0x0;
+        tmp_virt_page_table[i] = 0x0;
     }
-    temp_virt_page_table[1] = (page_table_entry_phys_addr1 & PAGE_MASK) | PAGE_PRESENT | PAGE_WRITABLE | PAGE_USER;
-    temp_virt_page_table[2] = (page_table_entry_phys_addr2 & PAGE_MASK) | PAGE_PRESENT | PAGE_WRITABLE | PAGE_USER;
-    unmap_temp_page();
+    tmp_virt_page_table[1] = (page_table_entry_phys_addr1 & PAGE_MASK) | PAGE_PRESENT | PAGE_WRITABLE | PAGE_USER;
+    tmp_virt_page_table[2] = (page_table_entry_phys_addr2 & PAGE_MASK) | PAGE_PRESENT | PAGE_WRITABLE | PAGE_USER;
+    unmap_tmp_page();
 
     uintptr_t page_directory_phys_addr = pmm_alloc(1);
-    uintptr_t *temp_virt_page_directory = map_temp_page(page_directory_phys_addr);
+    uintptr_t *tmp_virt_page_directory = map_tmp_page(page_directory_phys_addr);
     for (uint16_t i = 0; i < 1024; i++)
     {
-        temp_virt_page_directory[i] = 0x0;
+        tmp_virt_page_directory[i] = 0x0;
     }
-    temp_virt_page_directory[0] = (page_table_phys_addr & PAGE_MASK) | PAGE_PRESENT | PAGE_WRITABLE | PAGE_USER;
+    tmp_virt_page_directory[0] = (page_table_phys_addr & PAGE_MASK) | PAGE_PRESENT | PAGE_WRITABLE | PAGE_USER;
 
     for (uint32_t i = 768; i < 1024; i++)
     {
-        temp_virt_page_directory[i] = kernel_page_directory[i];
+        tmp_virt_page_directory[i] = kernel_page_directory[i];
     }
-    unmap_temp_page();
+    unmap_tmp_page();
 
     return page_directory_phys_addr;
+}
+
+void unmmap_ring3(uintptr_t page_directory_phys_addr)
+{
+    uintptr_t *tmp_virt_page_directory = map_tmp_page(page_directory_phys_addr);
+    uintptr_t page_table_phys_addr = tmp_virt_page_directory[0] & PAGE_MASK;
+    unmap_tmp_page();
+
+    uintptr_t *tmp_virt_page_table = map_tmp_page(page_table_phys_addr);
+    uintptr_t page_table_entry_phys_addr1 = tmp_virt_page_table[1] & PAGE_MASK;
+    uintptr_t page_table_entry_phys_addr2 = tmp_virt_page_table[2] & PAGE_MASK;
+    unmap_tmp_page();
+
+    pmm_free((void*)page_directory_phys_addr, 1);
+    pmm_free((void*)page_table_phys_addr, 1);
+    pmm_free((void*)page_table_entry_phys_addr1, 1);
+    pmm_free((void*)page_table_entry_phys_addr2, 1);
 }
 
 static int8_t size_to_class(size_t size)

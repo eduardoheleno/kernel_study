@@ -11,25 +11,33 @@ extern void irq0_stub(void);
 extern void irq1_stub(void);
 extern void syscall_stub(void);
 
-void exception_handler(uint8_t num)
+void exception_handler(cpu_exception_state_t *state)
 {
-    switch (num)
+    switch (state->exception_code)
     {
         case 0:
             terminal_writestring("Divided by 0!\n");
             break;
         case 14:
             terminal_writestring("Page Fault!\n");
+            if (state->error_code >> 2 == 1)
+            {
+                terminal_writestring("Terminating userspace process...\n");
+                task_exit();
+            }
+            else
+            {
+                terminal_writestring("Kernel crash\n");
+                __asm__ ("cli; hlt");
+            }
             break;
         default:
             terminal_writestring("Exception handler called without error num\n");
             break;
     }
-
-    __asm__ ("cli; hlt");
 }
 
-void syscall_handler(cpu_state_t *state)
+void syscall_handler(cpu_task_state_t *state)
 {
     switch (state->eax)
     {

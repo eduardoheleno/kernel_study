@@ -17,7 +17,7 @@ static uint64_t next_pid = 0;
 
 extern tss_t tss;
 extern uintptr_t kernel_page_directory[];
-extern void restore_task_context(cpu_state_t*);
+extern void restore_task_context(cpu_task_state_t*);
 
 static void wake_idle_task(void)
 {
@@ -189,7 +189,7 @@ void reaper_task_loop(void)
             disable_interrupts();
 
             task_t *dead_task = pop_dead_queue();
-            // TODO: free ring3 stack
+            if (dead_task->type == RING3_TASK) unmmap_ring3(dead_task->cr3);
             kfree(dead_task->ring0_stack_base);
             kfree(dead_task);
 
@@ -214,7 +214,7 @@ void init_scheduler(void)
     current_task = idle_task;
 }
 
-void scheduler_tick(cpu_state_t *state)
+void scheduler_tick(cpu_task_state_t *state)
 {
     if (task_total == 0)
     {
