@@ -11,6 +11,8 @@ extern void irq0_stub(void);
 extern void irq1_stub(void);
 extern void syscall_stub(void);
 
+extern task_t *current_task;
+
 void exception_handler(cpu_exception_state_t *state)
 {
     switch (state->exception_code)
@@ -41,8 +43,20 @@ void syscall_handler(cpu_task_state_t *state)
 {
     switch (state->eax)
     {
-        case TASK_EXIT:
+        case SYS_EXIT:
             task_exit();
+            break;
+        case SYS_WRITE:
+            switch (current_task->fds[state->ebx])
+            {
+                case FD_STDOUT:
+                case FD_STDERR:
+                    terminal_write((char*)state->ecx, state->edx);
+                    break;
+                case FD_STDIN:
+                    terminal_writestring("not implemented!\n");
+                    break;
+            }
             break;
         case 2:
             terminal_writestring("test syscall executed\n");

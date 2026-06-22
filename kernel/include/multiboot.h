@@ -1,6 +1,8 @@
 #ifndef _KERNEL_MULTIBOOT_H
 #define _KERNEL_MULTIBOOT_H
 
+#include "stdint.h"
+
 typedef unsigned char           multiboot_uint8_t;
 typedef unsigned short          multiboot_uint16_t;
 typedef unsigned int            multiboot_uint32_t;
@@ -102,6 +104,15 @@ struct multiboot_info
   };
 };
 typedef struct multiboot_info multiboot_info_t;
+
+struct multiboot_module
+{
+    uint32_t mod_start;
+    uint32_t mod_end;
+    uint32_t string;
+    uint32_t reserved;
+};
+typedef struct multiboot_module multiboot_module_t;
 
 struct multiboot_mmap_entry
 {

@@ -58,7 +58,7 @@ void kernel_main(
         unsigned long mbi_addr
      )
 {
-	terminal_initialize();
+    terminal_initialize();
     gdt_init();
     idt_init();
     pic_init(0x20, 0x28);
@@ -70,8 +70,8 @@ void kernel_main(
     enqueue_task(NULL, RING3_TASK);
 
     // enqueue_task(&test1, RING0_TASK);
-    enqueue_task(&test2, RING0_TASK);
-    enqueue_task(&test3, RING0_TASK);
+    // enqueue_task(&test2, RING0_TASK);
+    // enqueue_task(&test3, RING0_TASK);
 
     for (;;) 
     {

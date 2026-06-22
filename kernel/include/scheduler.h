@@ -42,11 +42,21 @@ enum task_type
 };
 typedef enum task_type task_type_t;
 
+enum fd_type
+{
+    FD_STDIN,
+    FD_STDOUT,
+    FD_STDERR
+};
+typedef enum fd_type fd_type_t;
+
 struct task
 {
     uint64_t pid;
     cpu_task_state_t context;
     uintptr_t cr3;
+
+    fd_type_t fds[3];
 
     void *ring0_stack_base;
     size_t ring0_stack_size;

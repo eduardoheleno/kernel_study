@@ -9,7 +9,7 @@
 
 static task_t *idle_task = NULL;
 static task_t *reaper_task = NULL;
-static task_t *current_task = NULL;
+task_t *current_task = NULL;
 static task_t *dead_queue = NULL;
 
 static uint64_t task_total = 0;
@@ -122,6 +122,10 @@ static task_t* create_task(void *entry, task_type_t type)
     new_task->context.edx = 0;
     new_task->context.ecx = 0;
     new_task->context.eax = 0;
+
+    new_task->fds[0] = FD_STDIN;
+    new_task->fds[1] = FD_STDOUT;
+    new_task->fds[2] = FD_STDERR;
 
     new_task->pid = next_pid++;
     new_task->status = TASK_READY;

@@ -5,6 +5,8 @@
 #include "tty.h"
 #include <stddef.h>
 
+multiboot_module_t userspace_module;
+
 extern char _kernel_start;
 extern uintptr_t kernel_page_directory[];
 
@@ -184,7 +186,8 @@ void init_memory(unsigned long mbi_addr, unsigned long last_paged_addr, uintptr_
     uint64_t bitmap_len = bitmap_size * sizeof(uint8_t);
     uint64_t total_bitmap_pages = bitmap_len / PAGE_SIZE;
 
-    for (uint64_t i = 0; i < total_bitmap_pages; i++) 
+    // TODO: fix this in a nicer way
+    for (uint64_t i = 0; i < total_bitmap_pages + 2; i++) 
     {
         *kernel_page_table_idx = kernel_end_addr | PAGE_PRESENT | PAGE_WRITABLE;
 
@@ -192,7 +195,10 @@ void init_memory(unsigned long mbi_addr, unsigned long last_paged_addr, uintptr_
         kernel_page_table_idx++;
     }
 
+    // TODO: fix this in a nicer way
+    last_paged_addr += PAGE_SIZE * 2;
     tmp_map_addr = kernel_end_addr + KERNEL_BASE;
+    userspace_module = *(multiboot_module_t*) mbi->mods_addr;
 
     populate_bitmap(mbi, mmap, kernel_end_addr, last_paged_addr);
     unmap_identity();
@@ -297,22 +303,11 @@ uintptr_t mmap_ring3(void)
     }
 
     uint8_t *user_code_virt_addr = (uint8_t*)tmp_virt_page_table_entry1;
-    // uint8_t user_code[] = {
-    //     0xB8, 0x02, 0x00, 0x00, 0x00, // mov $2, %eax     ; TEST syscall = 2
-    //     0xCD, 0x80,                   // int $0x80
-    //
-    //     0xB8, 0x01, 0x00, 0x00, 0x00, // mov $1, %eax     ; TASK_EXIT = 1
-    //     0xCD, 0x80,                   // int $0x80
-    //
-    //     0xEB, 0xFE                    // jmp .            ; se exit retornar, trava
-    // };
-    uint8_t user_code[] = {
-        0xA1, 0x00, 0x00, 0x90, 0x00, // mov 0x00900000, %eax
-        0xEB, 0xFE                    // jmp .
-    };
-    for (uint16_t i = 0; i < sizeof(user_code); i++)
+    uint8_t *user_code2 = (uint8_t*)((uint32_t)userspace_module.mod_start + KERNEL_BASE);
+    uint16_t limit = userspace_module.mod_end - userspace_module.mod_start;
+    for (uint16_t i = 0; i < limit; i++)
     {
-        user_code_virt_addr[i] = user_code[i];
+        user_code_virt_addr[i] = user_code2[i];
     }
     unmap_tmp_page();
 
