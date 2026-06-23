@@ -19,7 +19,7 @@ link: linker.ld
 	i686-elf-gcc -T linker.ld -o myos -ffreestanding -O2 -nostdlib boot.o gdt_asm.o gdt.o idt_asm.o idt.o scheduler_asm.o scheduler.o tty.o memory.o pic.o timer.o ../drivers/keyboard.o kernel.o
 
 run:
-	qemu-system-i386 -m 3G -kernel myos
+	qemu-system-i386 -m 3G -kernel myos -initrd ../userspace/hello.bin
 
 clean:
 	rm ./*.o ./myos
