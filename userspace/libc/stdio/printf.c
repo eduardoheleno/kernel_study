@@ -8,8 +8,6 @@ void printf(const char *s, ...)
     va_list ap;
     va_start(ap, s);
     size_t len = strlen(s);
-
-    char formatted_buffer[len];
     for (int i = 0; i < len; i++)
     {
         if (s[i] == '%')
@@ -17,35 +15,40 @@ void printf(const char *s, ...)
             switch (s[i + 1])
             {
                 case 'i':
-                    int value = va_arg(ap, int);
+                    int int_param = va_arg(ap, int);
                     char buffer[11];
                     int j = 0;
 
-                    if (value == 0) 
+                    if (int_param == 0) 
                     {
-                        formatted_buffer[i++] = '0';
+                        write(1, "0", 1);
+                        i++;
                         break;
                     }
 
-                    while (value > 0) 
+                    while (int_param > 0) 
                     {
-                        buffer[j++] = '0' + (value % 10);
-                        value /= 10;
+                        buffer[j++] = '0' + (int_param % 10);
+                        int_param /= 10;
                     }
 
                     while (j > 0) 
                     {
-                        formatted_buffer[i++] = buffer[--j];
+                        write(1, &buffer[--j], 1);
                     }
+                    i++;
+                    break;
+                case 's':
+                    char *char_param = va_arg(ap, char*);
+                    size_t char_len = strlen(char_param);
+                    write(1, char_param, char_len);
+                    i++;
                     break;
             }
         }
         else
         {
-            formatted_buffer[i] = s[i];
+            write(1, &s[i], 1);
         }
     }
-
-    size_t formatted_buffer_len = strlen(formatted_buffer);
-    write(1, formatted_buffer, formatted_buffer_len);
 }
