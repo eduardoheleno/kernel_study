@@ -13,7 +13,7 @@ scheduler_asm: ./scheduler/scheduler.s
 	i686-elf-as ./scheduler/scheduler.s -o scheduler_asm.o
 
 kernel: kernel.c tty.c memory.c pic.c timer.c ./gdt/gdt.c ./idt/idt.c ./scheduler/scheduler.c
-	i686-elf-gcc -c kernel.c tty.c pic.c timer.c memory.c ./gdt/gdt.c ./idt/idt.c ./scheduler/scheduler.c -I./include -std=gnu99 -ffreestanding -O2 -Wall -Wextra
+	i686-elf-gcc -c kernel.c tty.c pic.c timer.c memory.c ./gdt/gdt.c ./idt/idt.c ./scheduler/scheduler.c -I./include -I../drivers/include -std=gnu99 -ffreestanding -O2 -Wall -Wextra
 
 link: linker.ld
 	i686-elf-gcc -T linker.ld -o myos -ffreestanding -O2 -nostdlib boot.o gdt_asm.o gdt.o idt_asm.o idt.o scheduler_asm.o scheduler.o tty.o memory.o pic.o timer.o ../drivers/keyboard.o kernel.o

@@ -1,16 +1,17 @@
 #include "unistd.h"
 
-int write(int fd, const void *buf, size_t len)
+int read(int fd, void *buf, size_t len)
 {
     int ret;
 
     __asm__ volatile (
         "int $0x80"
         : "=a"(ret)
-        : "a"(4),
+        : "a"(3),
           "b"(fd),
           "c"(buf),
           "d"(len)
+        : "memory"
     );
 
     return ret;

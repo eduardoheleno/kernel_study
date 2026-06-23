@@ -67,7 +67,7 @@ void kernel_main(
     init_scheduler();
     enable_interrupts();
 
-    enqueue_task(NULL, RING3_TASK);
+    // enqueue_task(NULL, RING3_TASK);
 
     // enqueue_task(&test1, RING0_TASK);
     // enqueue_task(&test2, RING0_TASK);

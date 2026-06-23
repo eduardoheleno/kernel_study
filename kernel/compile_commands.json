@@ -6,6 +6,7 @@
       "-c",
       "kernel.c",
       "-I./include",
+      "-I../drivers/include",
       "-std=gnu99",
       "-ffreestanding",
       "-O2",
@@ -21,6 +22,103 @@
       "-c",
       "tty.c",
       "-I./include",
+      "-I../drivers/include",
+      "-std=gnu99",
+      "-ffreestanding",
+      "-O2",
+      "-Wall",
+      "-Wextra"
+    ],
+    "directory": "/Users/eduardomacos/github/kernel_study/kernel"
+  },
+  {
+    "file": "pic.c",
+    "arguments": [
+      "/Users/eduardomacos/opt/cross/bin/i686-elf-gcc",
+      "-c",
+      "pic.c",
+      "-I./include",
+      "-I../drivers/include",
+      "-std=gnu99",
+      "-ffreestanding",
+      "-O2",
+      "-Wall",
+      "-Wextra"
+    ],
+    "directory": "/Users/eduardomacos/github/kernel_study/kernel"
+  },
+  {
+    "file": "timer.c",
+    "arguments": [
+      "/Users/eduardomacos/opt/cross/bin/i686-elf-gcc",
+      "-c",
+      "timer.c",
+      "-I./include",
+      "-I../drivers/include",
+      "-std=gnu99",
+      "-ffreestanding",
+      "-O2",
+      "-Wall",
+      "-Wextra"
+    ],
+    "directory": "/Users/eduardomacos/github/kernel_study/kernel"
+  },
+  {
+    "file": "memory.c",
+    "arguments": [
+      "/Users/eduardomacos/opt/cross/bin/i686-elf-gcc",
+      "-c",
+      "memory.c",
+      "-I./include",
+      "-I../drivers/include",
+      "-std=gnu99",
+      "-ffreestanding",
+      "-O2",
+      "-Wall",
+      "-Wextra"
+    ],
+    "directory": "/Users/eduardomacos/github/kernel_study/kernel"
+  },
+  {
+    "file": "./gdt/gdt.c",
+    "arguments": [
+      "/Users/eduardomacos/opt/cross/bin/i686-elf-gcc",
+      "-c",
+      "./gdt/gdt.c",
+      "-I./include",
+      "-I../drivers/include",
+      "-std=gnu99",
+      "-ffreestanding",
+      "-O2",
+      "-Wall",
+      "-Wextra"
+    ],
+    "directory": "/Users/eduardomacos/github/kernel_study/kernel"
+  },
+  {
+    "file": "./idt/idt.c",
+    "arguments": [
+      "/Users/eduardomacos/opt/cross/bin/i686-elf-gcc",
+      "-c",
+      "./idt/idt.c",
+      "-I./include",
+      "-I../drivers/include",
+      "-std=gnu99",
+      "-ffreestanding",
+      "-O2",
+      "-Wall",
+      "-Wextra"
+    ],
+    "directory": "/Users/eduardomacos/github/kernel_study/kernel"
+  },
+  {
+    "file": "./scheduler/scheduler.c",
+    "arguments": [
+      "/Users/eduardomacos/opt/cross/bin/i686-elf-gcc",
+      "-c",
+      "./scheduler/scheduler.c",
+      "-I./include",
+      "-I../drivers/include",
       "-std=gnu99",
       "-ffreestanding",
       "-O2",

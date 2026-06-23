@@ -75,5 +75,7 @@ void init_scheduler(void);
 void enqueue_task(void *entry, task_type_t type);
 void scheduler_tick(cpu_task_state_t *state);
 void task_exit(void);
+void await_stdin(cpu_task_state_t *state);
+void wake_stdin_task(void);
 
 #endif

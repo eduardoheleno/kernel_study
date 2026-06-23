@@ -7,10 +7,12 @@
 #include "misc.h"
 #include "tty.h"
 
+task_t *current_task = NULL;
+
 static task_t *idle_task = NULL;
 static task_t *reaper_task = NULL;
-task_t *current_task = NULL;
 static task_t *dead_queue = NULL;
+static task_t *awaiting_stdin = NULL;
 
 static uint64_t task_total = 0;
 static uint64_t next_pid = 0;
@@ -43,6 +45,44 @@ static task_t* next_task(void)
     }
 
     return tmp_task;
+}
+
+void await_stdin(cpu_task_state_t *state)
+{
+    current_task->status = TASK_SLEEP;
+    current_task->context = *state;
+    if (current_task->context.cs == USER_CS)
+    {
+        current_task->context.esp = state->useresp;
+    }
+    else
+    {
+        current_task->context.esp = (uint32_t)&state->useresp;
+    }
+    // executes syscall again when restoring task
+    // syscall command = 2 bytes
+    current_task->context.eip -= 2;
+    awaiting_stdin = current_task;
+
+    if (task_total == 1) wake_idle_task();
+
+    task_t *ntask = next_task();
+    current_task = ntask;
+    if (task_total > 1) current_task->status = TASK_RUNNING;
+
+    reset_quantum();
+    tss.esp0 = (uint32_t)current_task->ring0_stack_base + PAGE_SIZE;
+    load_cr3(current_task->cr3);
+    restore_task_context(&current_task->context);
+}
+
+void wake_stdin_task(void)
+{
+    if (awaiting_stdin != NULL)
+    {
+        awaiting_stdin->status = TASK_READY;
+        awaiting_stdin = NULL;
+    }
 }
 
 static void push_dead_queue(task_t *task)
@@ -94,10 +134,7 @@ void task_exit(void)
     push_dead_queue(current_task);
     wake_reaper_task();
     current_task = ntask;
-    if (task_total > 0)
-    {
-        current_task->status = TASK_RUNNING;
-    }
+    if (task_total > 0) current_task->status = TASK_RUNNING;
 
     reset_quantum();
     tss.esp0 = (uint32_t)current_task->ring0_stack_base + PAGE_SIZE;
@@ -225,12 +262,21 @@ void scheduler_tick(cpu_task_state_t *state)
         wake_idle_task();
     }
 
+    task_t *ntask = next_task();
+    if (ntask == current_task)
+    {
+        pic_send_eoi(0);
+        return;
+    }
+
     if (current_task->status == TASK_SCHEDULER_IDLE)
     {
         current_task->status = TASK_SLEEP;
     }
     else
     {
+        current_task->status = TASK_READY;
+        current_task->context = *state;
         if (current_task->context.cs == USER_CS)
         {
             current_task->context.esp = state->useresp;
@@ -239,17 +285,7 @@ void scheduler_tick(cpu_task_state_t *state)
         {
             current_task->context.esp = (uint32_t)&state->useresp;
         }
-        current_task->status = TASK_READY;
-        current_task->context = *state;
     }
-
-    task_t *ntask = next_task();
-    if (ntask == current_task)
-    {
-        pic_send_eoi(0);
-        return;
-    }
-
     current_task = ntask;
     current_task->status = TASK_RUNNING;
 

@@ -7,6 +7,7 @@ crt:
 
 unistd:
 	i686-elf-gcc -ffreestanding -nostdlib -fno-pie -m32 -I ./libc/include/ -c ./libc/unistd/exit.c -o exit.o
+	i686-elf-gcc -ffreestanding -nostdlib -fno-pie -m32 -I ./libc/include/ -c ./libc/unistd/read.c -o read.o
 	i686-elf-gcc -ffreestanding -nostdlib -fno-pie -m32 -I ./libc/include/ -c ./libc/unistd/write.c -o write.o
 
 stdio:
@@ -16,7 +17,7 @@ string:
 	i686-elf-gcc -ffreestanding -nostdlib -fno-pie -m32 -I ./libc/include/ -c ./libc/string.c -o string.o
 
 libc:
-	i686-elf-ar rcs libc.a exit.o write.o printf.o string.o
+	i686-elf-ar rcs libc.a exit.o read.o write.o printf.o string.o
 
 program:
 	i686-elf-gcc -ffreestanding -nostdlib -fno-pie -m32 -I ./libc/include/ -c ./programs/hello.c -o hello.o

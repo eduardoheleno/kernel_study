@@ -2,6 +2,9 @@
 #define _DRIVER_KEYBOARD_H
 
 #include <stdint.h>
+#include <stddef.h>
+
+#define KEYBOARD_BUFFER_SIZE 4096
 
 enum KYBRD_CTRL_STATS_MASK {
 	KYBRD_CTRL_STATS_MASK_OUT_BUF	=	1,          //00000001
@@ -14,8 +17,7 @@ enum KYBRD_CTRL_STATS_MASK {
 	KYBRD_CTRL_STATS_MASK_PARITY	=	0x80		//10000000
 };
 
-uint8_t kybrd_ctrl_read_status();
-void kybrd_ctrl_send_cmd(uint8_t cmd);
-void keyboard_interrupt_handler(void);
+void read_keyboard_buffer(char *buffer, size_t len);
+int keyboard_buffer_has_line(void);
 
 #endif
