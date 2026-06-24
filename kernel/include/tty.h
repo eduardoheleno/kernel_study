@@ -32,5 +32,6 @@ void terminal_writestring(const char* data);
 void terminal_writeuint(uint32_t value);
 void terminal_writehex(uint32_t value);
 void terminal_write(const char* data, size_t size);
+size_t strlen(const char* str);
 
 #endif

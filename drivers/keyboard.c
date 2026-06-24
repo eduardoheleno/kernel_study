@@ -45,14 +45,17 @@ void test()
     test++;
 }
 
-void read_keyboard_buffer(char *buffer, size_t len)
+size_t read_keyboard_buffer(char *buffer, size_t len)
 {
-    for (size_t i = 0; i < len; i++)
+    size_t i = 0;
+    for (; i < len; i++)
     {
         if (buffer_head == buffer_tail) break;
         if (buffer_head >= KEYBOARD_BUFFER_SIZE) buffer_head = 0;
         buffer[i] = k_buffer[buffer_head++];
     }
+
+    return i * sizeof(char);
 }
 
 int keyboard_buffer_has_line(void)

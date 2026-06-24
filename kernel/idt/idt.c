@@ -49,7 +49,7 @@ void syscall_handler(cpu_task_state_t *state)
             break;
         case SYS_READ:
             if (keyboard_buffer_has_line() < 1) await_stdin(state);
-            read_keyboard_buffer((char*)state->ecx, state->edx);
+            state->eax = read_keyboard_buffer((char*)state->ecx, state->edx);
             break;
         case SYS_WRITE:
             switch (current_task->fds[state->ebx])
@@ -57,6 +57,7 @@ void syscall_handler(cpu_task_state_t *state)
                 case FD_STDOUT:
                 case FD_STDERR:
                     terminal_write((char*)state->ecx, state->edx);
+                    state->eax = sizeof(char) * strlen((char*)state->ecx);
                     break;
                 case FD_STDIN:
                     terminal_writestring("not implemented!\n");

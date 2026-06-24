@@ -49,6 +49,7 @@ static task_t* next_task(void)
 
 void await_stdin(cpu_task_state_t *state)
 {
+    // TODO: create a function to save cpu state
     current_task->status = TASK_SLEEP;
     current_task->context = *state;
     if (current_task->context.cs == USER_CS)
@@ -253,6 +254,8 @@ void init_scheduler(void)
     reaper_task->next = idle_task;
 
     current_task = idle_task;
+
+    terminal_writestring("Scheduler initialized\n");
 }
 
 void scheduler_tick(cpu_task_state_t *state)

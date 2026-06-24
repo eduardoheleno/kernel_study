@@ -17,7 +17,7 @@ enum KYBRD_CTRL_STATS_MASK {
 	KYBRD_CTRL_STATS_MASK_PARITY	=	0x80		//10000000
 };
 
-void read_keyboard_buffer(char *buffer, size_t len);
+size_t read_keyboard_buffer(char *buffer, size_t len);
 int keyboard_buffer_has_line(void);
 
 #endif
