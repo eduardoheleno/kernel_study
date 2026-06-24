@@ -38,10 +38,34 @@ void printf(const char *s, ...)
                     }
                     i++;
                     break;
+                case 'x':
+                    int hex_param_lower = va_arg(ap, int);
+                    char hex_digits_lower[] = "0123456789abcdef";
+
+                    write(1, "0x", 2);
+                    for (int j = 28; j >= 0; j -= 4)
+                    {
+                        int digit = (hex_param_lower >> j) & 0xF;
+                        write(1, &hex_digits_lower[digit], 1);
+                    }
+                    i++;
+                    break;
+                case 'X':
+                    int hex_param_upper = va_arg(ap, int);
+                    char hex_digits_upper[] = "0123456789ABCDEF";
+
+                    write(1, "0x", 2);
+                    for (int j = 28; j >= 0; j -= 4)
+                    {
+                        int digit = (hex_param_upper >> j) & 0xF;
+                        write(1, &hex_digits_upper[digit], 1);
+                    }
+                    i++;
+                    break;
                 case 's':
-                    char *char_param = va_arg(ap, char*);
-                    size_t char_len = strlen(char_param);
-                    write(1, char_param, char_len);
+                    char *string_param = va_arg(ap, char*);
+                    size_t char_len = strlen(string_param);
+                    write(1, string_param, char_len);
                     i++;
                     break;
             }
