@@ -8,6 +8,7 @@
 #include "memory.h"
 #include "pic.h"
 #include "timer.h"
+#include "vfs.h"
 #include "scheduler.h"
 #include "misc.h"
 
@@ -64,6 +65,7 @@ void kernel_main(
     pic_init(0x20, 0x28);
     pit_init();
     init_memory(mbi_addr, last_paged_addr, kernel_page_table_idx);
+    init_vfs();
     init_scheduler();
     enable_interrupts();
 

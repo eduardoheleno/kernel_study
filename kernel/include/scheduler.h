@@ -1,8 +1,12 @@
 #ifndef _KERNEL_SCHEDULER_H
 #define _KERNEL_SCHEDULER_H
 
+#include "vfs.h"
+
 #include <stdint.h>
 #include <stddef.h>
+
+#define MAX_FD_PER_PROCESS 16
 
 struct cpu_task_state
 {
@@ -42,21 +46,13 @@ enum task_type
 };
 typedef enum task_type task_type_t;
 
-enum fd_type
-{
-    FD_STDIN,
-    FD_STDOUT,
-    FD_STDERR
-};
-typedef enum fd_type fd_type_t;
-
 struct task
 {
     uint64_t pid;
     cpu_task_state_t context;
     uintptr_t cr3;
 
-    fd_type_t fds[3];
+    file_t *fds[MAX_FD_PER_PROCESS];
 
     void *ring0_stack_base;
     size_t ring0_stack_size;

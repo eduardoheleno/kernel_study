@@ -2,7 +2,6 @@
 
 #include "tty.h"
 #include "scheduler.h"
-#include "keyboard.h"
 
 static idt_entry_t idt_entries[256];
 static idt_t idt;
@@ -48,21 +47,33 @@ void syscall_handler(cpu_task_state_t *state)
             task_exit();
             break;
         case SYS_READ:
-            if (keyboard_buffer_has_line() < 1) await_stdin(state);
-            state->eax = read_keyboard_buffer((char*)state->ecx, state->edx);
+            if (stdin_buffer_has_line() < 1) await_stdin(state);
+            file_t *readf = current_task->fds[state->ebx];
+            if (readf->flags & ~RONLY || readf->ops->read == NULL)
+            {
+                state->eax = -1;
+                break;
+            }
+            state->eax = readf->ops->read((char*)state->ecx, state->edx);
             break;
         case SYS_WRITE:
-            switch (current_task->fds[state->ebx])
+            file_t *writef = current_task->fds[state->ebx];
+            if (writef->flags & ~WONLY || writef->ops->write == NULL)
             {
-                case FD_STDOUT:
-                case FD_STDERR:
-                    terminal_write((char*)state->ecx, state->edx);
-                    state->eax = sizeof(char) * strlen((char*)state->ecx);
-                    break;
-                case FD_STDIN:
-                    terminal_writestring("not implemented!\n");
-                    break;
+                state->eax = -1;
+                break;
             }
+            writef->ops->write((char*)state->ecx, state->edx);
+            state->eax = sizeof(char) * strlen((char*)state->ecx);
+            break;
+        case SYS_IOCTL:
+            file_t *ioctlf = current_task->fds[state->ebx];
+            if (ioctlf->ops->ioctl == NULL)
+            {
+                state->eax = -1;
+                break;
+            }
+            state->eax = ioctlf->ops->ioctl(state->ecx);
             break;
         case 2:
             terminal_writestring("test syscall executed\n");

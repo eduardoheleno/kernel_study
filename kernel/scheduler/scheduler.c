@@ -5,6 +5,7 @@
 #include "timer.h"
 #include "gdt.h"
 #include "misc.h"
+#include "vfs.h"
 #include "tty.h"
 
 task_t *current_task = NULL;
@@ -20,6 +21,8 @@ static uint64_t next_pid = 0;
 extern tss_t tss;
 extern uintptr_t kernel_page_directory[];
 extern void restore_task_context(cpu_task_state_t*);
+
+extern vnode_t *global_tty;
 
 static void wake_idle_task(void)
 {
@@ -161,9 +164,10 @@ static task_t* create_task(void *entry, task_type_t type)
     new_task->context.ecx = 0;
     new_task->context.eax = 0;
 
-    new_task->fds[0] = FD_STDIN;
-    new_task->fds[1] = FD_STDOUT;
-    new_task->fds[2] = FD_STDERR;
+    // TODO: free the opened files on reaper_task
+    new_task->fds[FD_STDIN] = open_file(global_tty, RONLY);
+    new_task->fds[FD_STDOUT] = open_file(global_tty, WONLY);
+    new_task->fds[FD_STDERR] = open_file(global_tty, WONLY);
 
     new_task->pid = next_pid++;
     new_task->status = TASK_READY;

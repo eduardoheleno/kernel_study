@@ -15,9 +15,6 @@ static const char *scancodes[] =
     "z", "x", "c", "v", "b", "n", "m", ",",
     NULL, NULL, NULL, NULL, NULL, " "
 };
-char k_buffer[KEYBOARD_BUFFER_SIZE];
-size_t buffer_head = 0;
-size_t buffer_tail = 0;
 
 // static uint8_t kybrd_ctrl_read_status()
 // {
@@ -34,40 +31,6 @@ size_t buffer_tail = 0;
 //     outb(0x64, cmd);
 // }
 
-void test()
-{
-    static uint8_t test = 0;
-    for (uint8_t i = 0; i < 10; i++)
-    {
-        terminal_writeuint(test);
-    }
-
-    test++;
-}
-
-size_t read_keyboard_buffer(char *buffer, size_t len)
-{
-    size_t i = 0;
-    for (; i < len; i++)
-    {
-        if (buffer_head == buffer_tail) break;
-        if (buffer_head >= KEYBOARD_BUFFER_SIZE) buffer_head = 0;
-        buffer[i] = k_buffer[buffer_head++];
-    }
-
-    return i * sizeof(char);
-}
-
-int keyboard_buffer_has_line(void)
-{
-    for (size_t i = buffer_head; i < buffer_tail; i++)
-    {
-        if (k_buffer[i] == '\n') return 1;
-    }
-
-    return -1;
-}
-
 void keyboard_interrupt_handler(void)
 {
     uint8_t scancode = inb(0x60);
@@ -81,16 +44,7 @@ void keyboard_interrupt_handler(void)
             return;
         }
 
-        if (buffer_tail < KEYBOARD_BUFFER_SIZE)
-        {
-            k_buffer[buffer_tail++] = *scancodes[scancode];
-        }
-        if (buffer_tail >= KEYBOARD_BUFFER_SIZE && buffer_head == buffer_tail)
-        {
-            buffer_tail = 0;
-            k_buffer[buffer_tail++] = *scancodes[scancode];
-        }
-        if (*scancodes[scancode] == '\n') wake_stdin_task();
+        write_tty_buffer(*scancodes[scancode]);
     }
 
     pic_send_eoi(1);

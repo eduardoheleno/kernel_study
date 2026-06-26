@@ -1,11 +1,19 @@
 #include "tty.h"
 
+#include "memory.h"
+#include "scheduler.h"
 #include "misc.h"
 
 static size_t terminal_row;
 static size_t terminal_column;
 static uint8_t terminal_color;
 static uint16_t* terminal_buffer = (uint16_t*)VGA_MEMORY;
+
+static char stdin_buffer[STDIN_BUFFER_SIZE];
+static size_t buffer_head = 0;
+static size_t buffer_tail = 0;
+
+static unsigned long flags;
 
 size_t strlen(const char* str) 
 {
@@ -141,4 +149,73 @@ void terminal_writehex(uint32_t value)
         uint8_t digit = (value >> i) & 0xF;
         terminal_putchar(hex_digits[digit]);
     }
+}
+
+void write_tty_buffer(char c)
+{
+    if (flags & ECHO_ON)
+    {
+        terminal_write(&c, 1);
+    }
+
+    if (buffer_tail < STDIN_BUFFER_SIZE)
+    {
+        stdin_buffer[buffer_tail++] = c;
+    }
+    if (buffer_tail >= STDIN_BUFFER_SIZE && buffer_head == buffer_tail)
+    {
+        buffer_tail = 0;
+        stdin_buffer[buffer_tail++] = c;
+    }
+    if (c == '\n') wake_stdin_task();
+}
+
+int stdin_buffer_has_line(void)
+{
+    for (size_t i = buffer_head; i < buffer_tail; i++)
+    {
+        if (stdin_buffer[i] == '\n') return 1;
+    }
+
+    return -1;
+}
+
+static size_t tty_read(void *buffer, size_t len)
+{
+    size_t i = 0;
+    char *out = buffer;
+    for (; i < len; i++)
+    {
+        if (buffer_head == buffer_tail) break;
+        if (buffer_head >= STDIN_BUFFER_SIZE) buffer_head = 0;
+        out[i] = stdin_buffer[buffer_head++];
+    }
+
+    return i * sizeof(char);
+}
+
+static void tty_write(const void *buf, size_t len)
+{
+    terminal_write(buf, len);
+}
+
+static int tty_ioctl(unsigned long request)
+{
+    // TODO: use "arg" param as the actual flag value and the "request" as
+    // the type of the operation, example:
+    // request: IOCTL_SET_FLAG, IOCTL_CLEAR_FLAG
+    // arg: (0 << 0), (1 << 0)
+    flags |= request;
+    return 1;
+}
+
+vnode_ops_t* tty_ops(void)
+{
+    vnode_ops_t *ops = kmalloc(sizeof(vnode_ops_t));
+    *ops = (vnode_ops_t){
+        .read = tty_read,
+        .write = tty_write,
+        .ioctl = tty_ioctl,
+        .close = NULL
+    };
 }

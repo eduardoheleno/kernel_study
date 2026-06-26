@@ -1,12 +1,21 @@
 #ifndef _KERNEL_TTY_H
 #define _KERNEL_TTY_H
 
+#include "vfs.h"
+
 #include <stdint.h>
 #include <stddef.h>
 
 #define VGA_WIDTH   80
 #define VGA_HEIGHT  25
 #define VGA_MEMORY  0xC03FF000
+
+#define STDIN_BUFFER_SIZE 4096
+
+#define WONLY    (0 << 0)
+#define RONLY    (1 << 0)
+#define ECHO_OFF (0 << 1)
+#define ECHO_ON  (1 << 1)
 
 enum vga_color {
 	VGA_COLOR_BLACK = 0,
@@ -33,5 +42,8 @@ void terminal_writeuint(uint32_t value);
 void terminal_writehex(uint32_t value);
 void terminal_write(const char* data, size_t size);
 size_t strlen(const char* str);
+void write_tty_buffer(char c);
+int stdin_buffer_has_line(void);
+vnode_ops_t* tty_ops(void);
 
 #endif
