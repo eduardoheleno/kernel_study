@@ -153,7 +153,7 @@ void terminal_writehex(uint32_t value)
 
 void write_tty_buffer(char c)
 {
-    if (flags & ECHO_ON)
+    if (flags & ECHO_FLAG)
     {
         terminal_write(&c, 1);
     }
@@ -176,7 +176,6 @@ int stdin_buffer_has_line(void)
     {
         if (stdin_buffer[i] == '\n') return 1;
     }
-
     return -1;
 }
 
@@ -190,7 +189,6 @@ static size_t tty_read(void *buffer, size_t len)
         if (buffer_head >= STDIN_BUFFER_SIZE) buffer_head = 0;
         out[i] = stdin_buffer[buffer_head++];
     }
-
     return i * sizeof(char);
 }
 
@@ -199,13 +197,18 @@ static void tty_write(const void *buf, size_t len)
     terminal_write(buf, len);
 }
 
-static int tty_ioctl(unsigned long request)
+static int tty_ioctl(unsigned long request, void *arg)
 {
-    // TODO: use "arg" param as the actual flag value and the "request" as
-    // the type of the operation, example:
-    // request: IOCTL_SET_FLAG, IOCTL_CLEAR_FLAG
-    // arg: (0 << 0), (1 << 0)
-    flags |= request;
+    unsigned long casted_arg = (unsigned long)arg;
+    switch (request)
+    {
+        case SET_FLAG_REQUEST:
+            flags |= casted_arg;
+            break;
+        case CLEAR_FLAG_REQUEST:
+            flags &= ~casted_arg;
+            break;
+    }
     return 1;
 }
 

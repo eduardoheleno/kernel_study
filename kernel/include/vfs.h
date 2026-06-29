@@ -12,7 +12,7 @@ struct vnode_ops
 {
     size_t (*read)(void *buffer, size_t len);
     void (*write)(const void *buffer, size_t len);
-    int (*ioctl)(unsigned long request);
+    int (*ioctl)(unsigned long request, void *arg);
     int (*close)(void);
 };
 typedef struct vnode_ops vnode_ops_t;

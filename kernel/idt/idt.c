@@ -49,7 +49,7 @@ void syscall_handler(cpu_task_state_t *state)
         case SYS_READ:
             if (stdin_buffer_has_line() < 1) await_stdin(state);
             file_t *readf = current_task->fds[state->ebx];
-            if (readf->flags & ~RONLY || readf->ops->read == NULL)
+            if (readf->flags & ~RONLY_FLAG || readf->ops->read == NULL)
             {
                 state->eax = -1;
                 break;
@@ -58,7 +58,7 @@ void syscall_handler(cpu_task_state_t *state)
             break;
         case SYS_WRITE:
             file_t *writef = current_task->fds[state->ebx];
-            if (writef->flags & ~WONLY || writef->ops->write == NULL)
+            if (writef->flags & ~WONLY_FLAG || writef->ops->write == NULL)
             {
                 state->eax = -1;
                 break;
@@ -73,7 +73,7 @@ void syscall_handler(cpu_task_state_t *state)
                 state->eax = -1;
                 break;
             }
-            state->eax = ioctlf->ops->ioctl(state->ecx);
+            state->eax = ioctlf->ops->ioctl(state->ecx, (void*)state->edx);
             break;
         case 2:
             terminal_writestring("test syscall executed\n");

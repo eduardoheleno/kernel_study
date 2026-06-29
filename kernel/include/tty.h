@@ -12,10 +12,12 @@
 
 #define STDIN_BUFFER_SIZE 4096
 
-#define WONLY    (0 << 0)
-#define RONLY    (1 << 0)
-#define ECHO_OFF (0 << 1)
-#define ECHO_ON  (1 << 1)
+#define SET_FLAG_REQUEST   1
+#define CLEAR_FLAG_REQUEST 2
+
+#define WONLY_FLAG (0 << 0)
+#define RONLY_FLAG (1 << 0)
+#define ECHO_FLAG  (1 << 1)
 
 enum vga_color {
 	VGA_COLOR_BLACK = 0,

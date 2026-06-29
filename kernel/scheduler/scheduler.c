@@ -41,6 +41,8 @@ static void sleep_reaper_task(void)
 
 static task_t* next_task(void)
 {
+    // TODO: infinite looping after first
+    // user process exit
     task_t *tmp_task = current_task->next;
     while (tmp_task->status != TASK_READY && tmp_task->status != TASK_SCHEDULER_IDLE)
     {
@@ -165,9 +167,9 @@ static task_t* create_task(void *entry, task_type_t type)
     new_task->context.eax = 0;
 
     // TODO: free the opened files on reaper_task
-    new_task->fds[FD_STDIN] = open_file(global_tty, RONLY);
-    new_task->fds[FD_STDOUT] = open_file(global_tty, WONLY);
-    new_task->fds[FD_STDERR] = open_file(global_tty, WONLY);
+    new_task->fds[FD_STDIN] = open_file(global_tty, RONLY_FLAG);
+    new_task->fds[FD_STDOUT] = open_file(global_tty, WONLY_FLAG);
+    new_task->fds[FD_STDERR] = open_file(global_tty, WONLY_FLAG);
 
     new_task->pid = next_pid++;
     new_task->status = TASK_READY;
