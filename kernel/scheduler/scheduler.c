@@ -29,6 +29,11 @@ static void wake_idle_task(void)
     idle_task->status = TASK_SCHEDULER_IDLE;
 }
 
+static void sleep_idle_task(void)
+{
+    idle_task->status = TASK_SLEEP;
+}
+
 static void wake_reaper_task(void)
 {
     reaper_task->status = TASK_READY;
@@ -41,8 +46,6 @@ static void sleep_reaper_task(void)
 
 static task_t* next_task(void)
 {
-    // TODO: infinite looping after first
-    // user process exit
     task_t *tmp_task = current_task->next;
     while (tmp_task->status != TASK_READY && tmp_task->status != TASK_SCHEDULER_IDLE)
     {
@@ -52,33 +55,38 @@ static task_t* next_task(void)
     return tmp_task;
 }
 
-void await_stdin(cpu_task_state_t *state)
+static void load_context(cpu_task_state_t *state)
 {
-    // TODO: create a function to save cpu state
-    current_task->status = TASK_SLEEP;
-    current_task->context = *state;
-    if (current_task->context.cs == USER_CS)
+    if (state != NULL)
     {
-        current_task->context.esp = state->useresp;
+        current_task->context = *state;
+        if (current_task->context.cs == USER_CS)
+        {
+            current_task->context.esp = state->useresp;
+        }
+        else
+        {
+            current_task->context.esp = (uint32_t)&state->useresp;
+        }
     }
-    else
-    {
-        current_task->context.esp = (uint32_t)&state->useresp;
-    }
-    // executes syscall again when restoring task
-    // syscall command = 2 bytes
-    current_task->context.eip -= 2;
-    awaiting_stdin = current_task;
-
-    if (task_total == 1) wake_idle_task();
-
     task_t *ntask = next_task();
     current_task = ntask;
-    if (task_total > 1) current_task->status = TASK_RUNNING;
+    if (current_task->pid != IDLE_PID) current_task->status = TASK_RUNNING;
 
     reset_quantum();
     tss.esp0 = (uint32_t)current_task->ring0_stack_base + PAGE_SIZE;
     load_cr3(current_task->cr3);
+}
+
+void await_stdin(cpu_task_state_t *state)
+{
+    disable_interrupts();
+
+    current_task->status = TASK_SLEEP;
+    state->eip -= 2;
+    if (task_total == 1) wake_idle_task();
+    awaiting_stdin = current_task;
+    load_context(state);
     restore_task_context(&current_task->context);
 }
 
@@ -133,18 +141,12 @@ void task_exit(void)
     {
         tmp_task = tmp_task->next;
     }
-
     tmp_task->next = current_task->next;
 
-    task_t *ntask = next_task();
-    push_dead_queue(current_task);
+    task_t *dead_task = current_task;
+    load_context(NULL);
+    push_dead_queue(dead_task);
     wake_reaper_task();
-    current_task = ntask;
-    if (task_total > 0) current_task->status = TASK_RUNNING;
-
-    reset_quantum();
-    tss.esp0 = (uint32_t)current_task->ring0_stack_base + PAGE_SIZE;
-    load_cr3(current_task->cr3);
     restore_task_context(&current_task->context);
 }
 
@@ -166,10 +168,10 @@ static task_t* create_task(void *entry, task_type_t type)
     new_task->context.ecx = 0;
     new_task->context.eax = 0;
 
-    // TODO: free the opened files on reaper_task
     new_task->fds[FD_STDIN] = open_file(global_tty, RONLY_FLAG);
     new_task->fds[FD_STDOUT] = open_file(global_tty, WONLY_FLAG);
     new_task->fds[FD_STDERR] = open_file(global_tty, WONLY_FLAG);
+    new_task->total_fds = 3;
 
     new_task->pid = next_pid++;
     new_task->status = TASK_READY;
@@ -200,9 +202,7 @@ static task_t* create_task(void *entry, task_type_t type)
             new_task->context.eip = (uint32_t)USER_CODE;
             break;
     }
-
     new_task->next = NULL;
-
     return new_task;
 }
 
@@ -218,9 +218,10 @@ void enqueue_task(void *entry, task_type_t type)
     tmp_task->next = new_task;
     new_task->next = current_task;
     task_total++;
+    sleep_idle_task();
 }
 
-void idle_task_loop(void)
+static void idle_task_loop(void)
 {
     for (;;)
     {
@@ -228,23 +229,28 @@ void idle_task_loop(void)
     }
 }
 
-void reaper_task_loop(void)
+static void reaper_task_loop(void)
 {
     for (;;)
     {
+        disable_interrupts();
         while (dead_queue != NULL)
         {
-            disable_interrupts();
-
             task_t *dead_task = pop_dead_queue();
             if (dead_task->type == RING3_TASK) unmmap_ring3(dead_task->cr3);
+
+            for (size_t i = 0; i < dead_task->total_fds; i++)
+            {
+                kfree(dead_task->fds[i]);
+            }
+
             kfree(dead_task->ring0_stack_base);
             kfree(dead_task);
-
-            enable_interrupts();
         }
 
         sleep_reaper_task();
+        load_context(NULL);
+        restore_task_context(&current_task->context);
     }
 }
 
@@ -271,6 +277,8 @@ void scheduler_tick(cpu_task_state_t *state)
         wake_idle_task();
     }
 
+    // TODO: next_task is being called here
+    // but is called on the "load_context" too.
     task_t *ntask = next_task();
     if (ntask == current_task)
     {
@@ -278,28 +286,12 @@ void scheduler_tick(cpu_task_state_t *state)
         return;
     }
 
-    if (current_task->status == TASK_SCHEDULER_IDLE)
-    {
-        current_task->status = TASK_SLEEP;
-    }
-    else
+    if (current_task->status != TASK_SCHEDULER_IDLE)
     {
         current_task->status = TASK_READY;
-        current_task->context = *state;
-        if (current_task->context.cs == USER_CS)
-        {
-            current_task->context.esp = state->useresp;
-        }
-        else
-        {
-            current_task->context.esp = (uint32_t)&state->useresp;
-        }
     }
-    current_task = ntask;
-    current_task->status = TASK_RUNNING;
 
-    tss.esp0 = (uint32_t)current_task->ring0_stack_base + PAGE_SIZE;
-    load_cr3(current_task->cr3);
     pic_send_eoi(0);
+    load_context(state);
     restore_task_context(&current_task->context);
 }

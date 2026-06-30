@@ -6,6 +6,9 @@
 #include <stdint.h>
 #include <stddef.h>
 
+#define IDLE_PID   0
+#define REAPER_PID 1
+
 #define MAX_FD_PER_PROCESS 16
 
 struct cpu_task_state
@@ -53,6 +56,7 @@ struct task
     uintptr_t cr3;
 
     file_t *fds[MAX_FD_PER_PROCESS];
+    size_t total_fds;
 
     void *ring0_stack_base;
     size_t ring0_stack_size;

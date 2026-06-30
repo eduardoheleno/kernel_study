@@ -153,6 +153,7 @@ void terminal_writehex(uint32_t value)
 
 void write_tty_buffer(char c)
 {
+    // TODO: ignore write if no process is awaiting
     if (flags & ECHO_FLAG)
     {
         terminal_write(&c, 1);
