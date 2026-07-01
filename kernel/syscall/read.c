@@ -1,0 +1,12 @@
+#include "syscall.h"
+#include "tty.h"
+
+int sys_read(uintptr_t fd, char *buffer, size_t len)
+{
+    file_t *f = current_task->fds[fd];
+    if (f->flags & ~RONLY_FLAG || f->ops->read == NULL)
+    {
+        return -1;
+    }
+    return f->ops->read(buffer, len);
+}

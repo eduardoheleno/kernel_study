@@ -159,7 +159,6 @@ static void task_trampoline(void)
 static task_t* create_task(void *entry, task_type_t type)
 {
     task_t *new_task = kmalloc(sizeof(task_t));
-
     new_task->context.edi = 0;
     new_task->context.esi = 0;
     new_task->context.ebp = 0;
@@ -198,8 +197,9 @@ static task_t* create_task(void *entry, task_type_t type)
             new_task->cr3 = mmap_ring3();
             new_task->ring3_stack_base = (void*)USER_STACK;
             new_task->ring3_stack_size = PAGE_SIZE;
-            new_task->context.esp = (uintptr_t)USER_STACK + PAGE_SIZE;
-            new_task->context.eip = (uint32_t)USER_CODE;
+            new_task->context.esp = USER_STACK + PAGE_SIZE;
+            new_task->program_break = USER_STACK + PAGE_SIZE;
+            new_task->context.eip = USER_CODE;
             break;
     }
     new_task->next = NULL;

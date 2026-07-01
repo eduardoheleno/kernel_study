@@ -1,6 +1,6 @@
 #include "unistd.h"
 
-int write(int fd, const void *buf, size_t len)
+int write(unsigned int fd, const void *buf, size_t len)
 {
     int ret;
 

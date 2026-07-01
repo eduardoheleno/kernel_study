@@ -1,10 +1,10 @@
 #ifndef _KERNEL_SCHEDULER_H
 #define _KERNEL_SCHEDULER_H
 
-#include "vfs.h"
-
 #include <stdint.h>
 #include <stddef.h>
+
+#include "vfs.h"
 
 #define IDLE_PID   0
 #define REAPER_PID 1
@@ -54,6 +54,8 @@ struct task
     uint64_t pid;
     cpu_task_state_t context;
     uintptr_t cr3;
+
+    uintptr_t program_break;
 
     file_t *fds[MAX_FD_PER_PROCESS];
     size_t total_fds;

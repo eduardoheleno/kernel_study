@@ -1,6 +1,6 @@
 #include "unistd.h"
 
-int read(int fd, void *buf, size_t len)
+int read(unsigned int fd, void *buf, size_t len)
 {
     int ret;
 
