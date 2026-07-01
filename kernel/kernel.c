@@ -24,33 +24,6 @@
 
 // #define MULTIBOOT_BOOTLOADER_MAGIC              0x2BADB002
 
-void test1()
-{
-    volatile uint8_t test = *(volatile uint8_t *)(uintptr_t)0xFFFFFFFF;
-    (void)test;
-
-    for(uint8_t i = 0; i < 10; i++)
-    {
-        terminal_writestring("A");
-    }
-}
-
-void test2()
-{
-    for (uint8_t i = 0; i < 10; i++)
-    {
-        terminal_writestring("B");
-    }
-}
-
-void test3()
-{
-    for (uint8_t i = 0; i < 10; i++)
-    {
-        terminal_writestring("C");
-    }
-}
-
 // TODO: improve code organization
 void kernel_main(
         uintptr_t *kernel_page_table_idx,
@@ -68,12 +41,6 @@ void kernel_main(
     init_vfs();
     init_scheduler();
     enable_interrupts();
-
-    // enqueue_task(NULL, RING3_TASK);
-
-    // enqueue_task(&test1, RING0_TASK);
-    // enqueue_task(&test2, RING0_TASK);
-    // enqueue_task(&test3, RING0_TASK);
 
     for (;;) 
     {

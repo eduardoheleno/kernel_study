@@ -13,7 +13,7 @@ task_t *current_task = NULL;
 static task_t *idle_task = NULL;
 static task_t *reaper_task = NULL;
 static task_t *dead_queue = NULL;
-static task_t *awaiting_stdin = NULL;
+task_t *awaiting_stdin = NULL;
 
 static uint64_t task_total = 0;
 static uint64_t next_pid = 0;

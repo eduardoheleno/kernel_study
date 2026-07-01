@@ -15,6 +15,8 @@ static size_t buffer_tail = 0;
 
 static unsigned long flags;
 
+extern task_t *awaiting_stdin;
+
 size_t strlen(const char* str) 
 {
 	size_t len = 0;
@@ -153,11 +155,12 @@ void terminal_writehex(uint32_t value)
 
 void write_tty_buffer(char c)
 {
-    // TODO: ignore write if no process is awaiting
     if (flags & ECHO_FLAG)
     {
         terminal_write(&c, 1);
     }
+
+    if (awaiting_stdin == NULL) return;
 
     if (buffer_tail < STDIN_BUFFER_SIZE)
     {

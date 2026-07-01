@@ -12,6 +12,7 @@ unistd:
 
 stdio:
 	i686-elf-gcc -ffreestanding -nostdlib -fno-pie -m32 -I ./libc/include/ -c ./libc/stdio/printf.c -o printf.o
+	i686-elf-gcc -ffreestanding -nostdlib -fno-pie -m32 -I ./libc/include/ -c ./libc/stdio/fgets.c -o fgets.o
 
 string:
 	i686-elf-gcc -ffreestanding -nostdlib -fno-pie -m32 -I ./libc/include/ -c ./libc/string.c -o string.o
@@ -20,7 +21,7 @@ ioctl:
 	i686-elf-gcc -ffreestanding -nostdlib -fno-pie -m32 -I ./libc/include/ -c ./libc/ioctl.c -o ioctl.o
 
 libc:
-	i686-elf-ar rcs libc.a exit.o read.o write.o printf.o string.o ioctl.o
+	i686-elf-ar rcs libc.a exit.o read.o write.o printf.o fgets.o string.o ioctl.o
 
 program:
 	i686-elf-gcc -ffreestanding -nostdlib -fno-pie -m32 -I ./libc/include/ -c ./programs/hello.c -o hello.o
