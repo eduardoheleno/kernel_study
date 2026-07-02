@@ -55,8 +55,6 @@ struct task
     cpu_task_state_t context;
     uintptr_t cr3;
 
-    uintptr_t program_break;
-
     file_t *fds[MAX_FD_PER_PROCESS];
     size_t total_fds;
 

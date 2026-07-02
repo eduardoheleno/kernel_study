@@ -54,12 +54,8 @@ void syscall_handler(cpu_task_state_t *state)
         case SYS_WRITE:
             state->eax = sys_write(state->ebx, (char*)state->ecx, state->edx);
             break;
-        case SYS_BRK:
-            if (state->ebx == 0)
-            {
-                state->eax = current_task->program_break;
-                break;
-            }
+        case SYS_MMAP:
+            state->eax = sys_mmap((void*)state->ebx, state->ecx);
             break;
         case SYS_IOCTL:
             state->eax = sys_ioctl(state->ebx, state->ecx, (void*)state->edx);

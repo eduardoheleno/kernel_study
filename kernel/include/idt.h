@@ -3,10 +3,10 @@
 
 #include <stdint.h>
 
-// syscalls
 #define SYS_EXIT   1
 #define SYS_READ   3
 #define SYS_WRITE  4
+#define SYS_MMAP   9
 #define SYS_BRK   45
 #define SYS_IOCTL 54
 

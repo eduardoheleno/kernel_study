@@ -198,7 +198,6 @@ static task_t* create_task(void *entry, task_type_t type)
             new_task->ring3_stack_base = (void*)USER_STACK;
             new_task->ring3_stack_size = PAGE_SIZE;
             new_task->context.esp = USER_STACK + PAGE_SIZE;
-            new_task->program_break = USER_STACK + PAGE_SIZE;
             new_task->context.eip = USER_CODE;
             break;
     }

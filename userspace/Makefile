@@ -1,6 +1,6 @@
 .PHONY: all crt unistd stdio string libc program clean
 
-all: crt unistd stdio string ioctl libc program
+all: crt unistd stdio string ioctl mmap libc program
 
 crt:
 	i686-elf-gcc -ffreestanding -nostdlib -fno-pie -m32 -I ./libc/include/ -c ./crt/crt0.c -o crt0.o
@@ -20,8 +20,11 @@ string:
 ioctl:
 	i686-elf-gcc -ffreestanding -nostdlib -fno-pie -m32 -I ./libc/include/ -c ./libc/ioctl.c -o ioctl.o
 
+mmap:
+	i686-elf-gcc -ffreestanding -nostdlib -fno-pie -m32 -I ./libc/include/ -c ./libc/mmap.c -o mmap.o
+
 libc:
-	i686-elf-ar rcs libc.a exit.o read.o write.o printf.o fgets.o string.o ioctl.o
+	i686-elf-ar rcs libc.a exit.o read.o write.o printf.o fgets.o string.o ioctl.o mmap.o
 
 program:
 	i686-elf-gcc -ffreestanding -nostdlib -fno-pie -m32 -I ./libc/include/ -c ./programs/hello.c -o hello.o

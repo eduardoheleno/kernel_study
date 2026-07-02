@@ -225,4 +225,5 @@ vnode_ops_t* tty_ops(void)
         .ioctl = tty_ioctl,
         .close = NULL
     };
+    return ops;
 }
