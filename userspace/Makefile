@@ -1,6 +1,6 @@
 .PHONY: all crt unistd stdio string libc malloc stdlib program clean
 
-all: crt unistd stdio string ioctl mmap libc malloc stdlib program
+all: crt unistd stdio string ioctl mmap libc malloc free stdlib program
 
 crt:
 	i686-elf-gcc -ffreestanding -nostdlib -fno-pie -m32 -I ./libc/include/ -c ./crt/crt0.c -o crt0.o
@@ -29,8 +29,11 @@ libc:
 malloc:
 	i686-elf-gcc -ffreestanding -nostdlib -fno-pie -m32 -I ./stdlib/include/ -I ./libc/include/ -c ./stdlib/malloc.c -o malloc.o
 
+free:
+	i686-elf-gcc -ffreestanding -nostdlib -fno-pie -m32 -I ./stdlib/include/ -I ./libc/include/ -c ./stdlib/free.c -o free.o
+
 stdlib:
-	i686-elf-ar rcs stdlib.a malloc.o
+	i686-elf-ar rcs stdlib.a malloc.o free.o
 
 program:
 	i686-elf-gcc -ffreestanding -nostdlib -fno-pie -m32 -I ./libc/include/ -I ./stdlib/include/ -c ./programs/hello.c -o hello.o

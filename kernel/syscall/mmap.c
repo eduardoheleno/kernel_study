@@ -4,7 +4,7 @@
 #include "tty.h"
 
 // ignoring addr param for now
-int sys_mmap(void *addr, size_t len)
+int sys_mmap(void* addr, size_t len)
 {
     int first_addr = 0;
     uint32_t mapped_pages = 0;
