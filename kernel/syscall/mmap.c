@@ -1,6 +1,7 @@
 #include "syscall.h"
 #include "memory.h"
 #include "misc.h"
+#include "tty.h"
 
 // ignoring addr param for now
 int sys_mmap(void *addr, size_t len)
@@ -46,6 +47,12 @@ int sys_mmap(void *addr, size_t len)
                 invlpg(current_task->cr3);
 
                 if (mapped_pages++ == 0) first_addr = (pd_idx << 22) | (pt_idx << 12);
+                terminal_writestring("pd_idx: ");
+                terminal_writeuint(pd_idx);
+                terminal_writestring("\n");
+                terminal_writestring("pt_idx: ");
+                terminal_writeuint(pt_idx);
+                terminal_writestring("\n");
                 if (mapped_pages == total_pages) return first_addr;
             }
             else
@@ -67,6 +74,12 @@ int sys_mmap(void *addr, size_t len)
                     invlpg(current_task->cr3);
 
                     if (mapped_pages++ == 0) first_addr = (pd_idx << 22) | (pt_idx << 12);
+                    terminal_writestring("pd_idx: ");
+                    terminal_writeuint(pd_idx);
+                    terminal_writestring("\n");
+                    terminal_writestring("pt_idx: ");
+                    terminal_writeuint(pt_idx);
+                    terminal_writestring("\n");
                     if (mapped_pages == total_pages) return first_addr;
                 }
             }

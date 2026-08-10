@@ -1,6 +1,6 @@
 #include "mmap.h"
 
-uintptr_t* mmap(void *addr, size_t len)
+void* mmap(void *addr, size_t len)
 {
     uintptr_t *ret;
 

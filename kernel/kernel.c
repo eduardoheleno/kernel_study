@@ -25,6 +25,7 @@
 // #define MULTIBOOT_BOOTLOADER_MAGIC              0x2BADB002
 
 // TODO: improve code organization
+// TODO: check memory alignment on kernel allocation
 void kernel_main(
         uintptr_t *kernel_page_table_idx,
         unsigned long last_paged_addr,

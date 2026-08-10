@@ -3,3 +3,5 @@
 *.bin
 *.elf
 myos
+compile_commands.json
+.cache/

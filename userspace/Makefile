@@ -1,6 +1,6 @@
-.PHONY: all crt unistd stdio string libc program clean
+.PHONY: all crt unistd stdio string libc malloc stdlib program clean
 
-all: crt unistd stdio string ioctl mmap libc program
+all: crt unistd stdio string ioctl mmap libc malloc stdlib program
 
 crt:
 	i686-elf-gcc -ffreestanding -nostdlib -fno-pie -m32 -I ./libc/include/ -c ./crt/crt0.c -o crt0.o
@@ -26,9 +26,15 @@ mmap:
 libc:
 	i686-elf-ar rcs libc.a exit.o read.o write.o printf.o fgets.o string.o ioctl.o mmap.o
 
+malloc:
+	i686-elf-gcc -ffreestanding -nostdlib -fno-pie -m32 -I ./stdlib/include/ -I ./libc/include/ -c ./stdlib/malloc.c -o malloc.o
+
+stdlib:
+	i686-elf-ar rcs stdlib.a malloc.o
+
 program:
-	i686-elf-gcc -ffreestanding -nostdlib -fno-pie -m32 -I ./libc/include/ -c ./programs/hello.c -o hello.o
-	i686-elf-ld -m elf_i386 -Ttext=0x00001000 -e _start crt0.o hello.o libc.a -o hello.elf
+	i686-elf-gcc -ffreestanding -nostdlib -fno-pie -m32 -I ./libc/include/ -I ./stdlib/include/ -c ./programs/hello.c -o hello.o
+	i686-elf-ld -m elf_i386 -Ttext=0x00001000 -e _start crt0.o hello.o stdlib.a libc.a -o hello.elf
 	i686-elf-objcopy -O binary hello.elf hello.bin
 
 clean:
