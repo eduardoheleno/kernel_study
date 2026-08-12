@@ -2,6 +2,7 @@
 #define _KERNEL_MISC_H
 
 #include <stdint.h>
+#include "memory.h"
 
 static inline uintptr_t align_up_4k(uintptr_t addr)
 {
@@ -73,6 +74,11 @@ static inline void load_cr3(uintptr_t pd_phys_addr)
         : "r"(pd_phys_addr)
         : "memory"
     );
+}
+
+static inline uint32_t pages_required(uint32_t len)
+{
+    return (len + PAGE_SIZE - 1) / PAGE_SIZE;
 }
 
 #endif

@@ -36,8 +36,6 @@
 
 #define NUM_CLASSES   8
 
-// TODO: i think that is necessary to map previous too, cause if some middle slab is freed
-// there's no way to attach both sides.
 struct slab
 {
     struct slab *next;
@@ -68,6 +66,7 @@ typedef struct slab_cache slab_cache_t;
 void init_memory(unsigned long mbi_addr, unsigned long last_paged_addr, uintptr_t *kernel_page_table_idx);
 
 uintptr_t pmm_alloc(uint32_t npages);
+void pmm_free(void *addr, uint32_t npages);
 uintptr_t* map_tmp_page(uintptr_t phys_addr);
 void unmap_tmp_page(void);
 

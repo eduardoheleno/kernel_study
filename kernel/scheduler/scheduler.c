@@ -276,8 +276,6 @@ void scheduler_tick(cpu_task_state_t *state)
         wake_idle_task();
     }
 
-    // TODO: next_task is being called here
-    // but is called on the "load_context" too.
     task_t *ntask = next_task();
     if (ntask == current_task)
     {

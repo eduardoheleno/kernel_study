@@ -60,6 +60,9 @@ void syscall_handler(cpu_task_state_t *state)
         case SYS_IOCTL:
             state->eax = sys_ioctl(state->ebx, state->ecx, (void*)state->edx);
             break;
+        case SYS_MUNMAP:
+            state->eax = sys_munmap((void*)state->ebx, state->ecx);
+            break;
         case 2:
             terminal_writestring("test syscall executed\n");
             break;

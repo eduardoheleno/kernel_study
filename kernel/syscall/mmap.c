@@ -12,7 +12,9 @@ int sys_mmap(void* addr, size_t len)
     if (len % PAGE_SIZE > 0) total_pages++;
 
     // TODO: optimize this
-    // TODO: fix this TERRIBLE code
+    // TODO: improve this TERRIBLE code
+    // TODO: invlpg should be called for every mapped page, currently is 
+    // calling only for "first_addr"
     uint32_t pd_idx = 0;
     uint32_t pt_idx = 1;
 
@@ -44,7 +46,6 @@ int sys_mmap(void* addr, size_t len)
 
                 uintptr_t *tmp_pt = map_tmp_page(pt_addr);
                 tmp_pt[pt_idx] = (page_phys_addr & PAGE_MASK) | PAGE_PRESENT | PAGE_WRITABLE | PAGE_USER;
-                invlpg(current_task->cr3);
 
                 if (mapped_pages++ == 0) first_addr = (pd_idx << 22) | (pt_idx << 12);
                 terminal_writestring("pd_idx: ");
@@ -53,6 +54,7 @@ int sys_mmap(void* addr, size_t len)
                 terminal_writestring("pt_idx: ");
                 terminal_writeuint(pt_idx);
                 terminal_writestring("\n");
+                invlpg(first_addr);
                 if (mapped_pages == total_pages) return first_addr;
             }
             else
@@ -71,7 +73,6 @@ int sys_mmap(void* addr, size_t len)
 
                     tmp_pt = map_tmp_page(pt_addr);
                     tmp_pt[pt_idx] = (page_phys_addr & PAGE_MASK) | PAGE_PRESENT | PAGE_WRITABLE | PAGE_USER;
-                    invlpg(current_task->cr3);
 
                     if (mapped_pages++ == 0) first_addr = (pd_idx << 22) | (pt_idx << 12);
                     terminal_writestring("pd_idx: ");
@@ -80,6 +81,7 @@ int sys_mmap(void* addr, size_t len)
                     terminal_writestring("pt_idx: ");
                     terminal_writeuint(pt_idx);
                     terminal_writestring("\n");
+                    invlpg(first_addr);
                     if (mapped_pages == total_pages) return first_addr;
                 }
             }

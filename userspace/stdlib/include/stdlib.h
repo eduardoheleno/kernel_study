@@ -11,10 +11,12 @@ typedef struct mem_block mem_block_t;
 
 struct page_block
 {
+    size_t og_size;
     size_t free_size;
     void* next_free_addr;
     mem_block_t* free_blocks;
     page_block_t* next_page_block;
+    page_block_t* prev_page_block;
 };
 
 struct mem_block

@@ -13,9 +13,11 @@ static page_block_t* alloc_page_block(size_t size)
 {
     uint32_t total_pages = pages_required(size);
     page_block_t *new_page_block = mmap(NULL, size);
+    new_page_block->og_size = (PAGE_SIZE * total_pages);
     new_page_block->free_size = (PAGE_SIZE * total_pages) - sizeof(page_block_t);
     new_page_block->free_blocks = NULL;
     new_page_block->next_page_block = NULL;
+    new_page_block->prev_page_block = NULL;
     new_page_block->next_free_addr = (void*)new_page_block + sizeof(page_block_t);
     return new_page_block;
 }
@@ -75,6 +77,7 @@ void* malloc(size_t size)
         }
 
         page_block_t* new_page_block = alloc_page_block(alloc_size);
+        new_page_block->prev_page_block = prev_it_page_block;
         prev_it_page_block->next_page_block = new_page_block;
         mem_block_t* new_mem_block = alloc_mem_block(target_size, new_page_block);
         return (void*)new_mem_block + sizeof(mem_block_t);

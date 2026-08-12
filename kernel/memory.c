@@ -161,7 +161,7 @@ uintptr_t pmm_alloc(uint32_t npages)
     return ((i - (npages - 1)) * PAGE_SIZE);
 }
 
-static void pmm_free(void *addr, uint32_t npages)
+void pmm_free(void *addr, uint32_t npages)
 {
     // TODO: implement check for non valid addresses
     uint64_t bitmap_idx = (uintptr_t)addr / PAGE_SIZE;

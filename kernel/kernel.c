@@ -26,6 +26,8 @@
 
 // TODO: improve code organization
 // TODO: check memory alignment on kernel allocation
+// TODO: check use of invlpg (should be used only with virtual addresses)
+// TODO: test entire flow of malloc
 void kernel_main(
         uintptr_t *kernel_page_table_idx,
         unsigned long last_paged_addr,
