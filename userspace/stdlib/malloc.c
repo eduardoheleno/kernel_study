@@ -36,7 +36,8 @@ static mem_block_t* alloc_mem_block(size_t size, page_block_t* page_parent)
 
 void* malloc(size_t size)
 {
-    size_t target_size = align_up(size) + sizeof(mem_block_t);
+    size_t aligned_size = align_up(size);
+    size_t target_size = aligned_size + sizeof(mem_block_t);
     size_t alloc_size = target_size + sizeof(page_block_t);
     uint32_t total_pages = pages_required(alloc_size);
 
@@ -56,13 +57,57 @@ void* malloc(size_t size)
             if (it_page_block->free_blocks)
             {
                 mem_block_t* it_mem_block = it_page_block->free_blocks;
+                mem_block_t* prev_it_mem_block = NULL;
                 while (it_mem_block != NULL)
                 {
-                    if (it_mem_block->size >= target_size)
+                    if (it_mem_block->size > aligned_size)
                     {
-                        // TODO: reuse allocated block and if the size is less then
-                        // the target size split it
+                        printf("msize: %i\n", it_mem_block->size);
+                        mem_block_t* splitted_mem_block = it_mem_block + target_size;
+                        splitted_mem_block->size = it_mem_block->size - target_size;
+                        splitted_mem_block->is_allocated = 0;
+                        splitted_mem_block->parent_page = it_mem_block->parent_page;
+
+                        it_mem_block->size = aligned_size;
+                        it_mem_block->is_allocated = 1;
+                        splitted_mem_block->next_mem_block = it_mem_block->next_mem_block;
+                        if (prev_it_mem_block == NULL)
+                        {
+                            it_mem_block->parent_page->free_blocks = splitted_mem_block;
+                        }
+                        else
+                        {
+                            prev_it_mem_block->next_mem_block = splitted_mem_block;
+                        }
+
+                        it_mem_block->next_mem_block = NULL;
+
+                        // == Test ==
+                        mem_block_t* it_mem_block_test = it_mem_block->parent_page->free_blocks;
+                        while (it_mem_block_test != NULL)
+                        {
+                            printf("size: %i\n", it_mem_block_test->size);
+                            printf("is_allocated: %i\n", it_mem_block_test->is_allocated);
+                            it_mem_block_test = it_mem_block_test->next_mem_block;
+                        }
+                        return (void*)it_mem_block + sizeof(mem_block_t);
                     }
+
+                    if (it_mem_block->size == aligned_size)
+                    {
+                        it_mem_block->is_allocated = 1;
+                        if (prev_it_mem_block == NULL)
+                        {
+                            it_mem_block->parent_page->free_blocks = it_mem_block->next_mem_block;
+                        }
+                        else
+                        {
+                            prev_it_mem_block->next_mem_block = it_mem_block->next_mem_block;
+                        }
+
+                        return (void*)it_mem_block + sizeof(mem_block_t);
+                    }
+                    prev_it_mem_block = it_mem_block;
                     it_mem_block = it_mem_block->next_mem_block;
                 }
             }
