@@ -2,7 +2,7 @@
 #include "mmap.h"
 #include "stdio.h"
 
-static page_block_t* mem_pool = NULL;
+page_block_t* mem_pool = NULL;
 
 static size_t align_up(size_t size)
 {

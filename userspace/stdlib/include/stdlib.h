@@ -27,6 +27,8 @@ struct mem_block
     _Bool is_allocated;
 };
 
+extern page_block_t* mem_pool;
+
 static inline uint32_t pages_required(uint32_t len)
 {
     return (len + PAGE_SIZE - 1) / PAGE_SIZE;
