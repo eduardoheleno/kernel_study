@@ -59,8 +59,7 @@ void free(void* addr)
         it_mem_block = it_mem_block->next_mem_block;
     }
 
-    // TODO: only merge blocks if they're adjacent
-    if (it_mem_block->is_allocated == 0)
+    if (it_mem_block->is_allocated == 0 && (void*)it_mem_block + it_mem_block->size + sizeof(mem_block_t) == (void*)mem_block)
     {
         it_mem_block->size += mem_block->size + sizeof(mem_block_t);
     }

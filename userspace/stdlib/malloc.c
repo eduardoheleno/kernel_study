@@ -62,8 +62,7 @@ void* malloc(size_t size)
                 {
                     if (it_mem_block->size > aligned_size)
                     {
-                        printf("msize: %i\n", it_mem_block->size);
-                        mem_block_t* splitted_mem_block = it_mem_block + target_size;
+                        mem_block_t* splitted_mem_block = (mem_block_t*)((uint8_t*)it_mem_block + target_size);
                         splitted_mem_block->size = it_mem_block->size - target_size;
                         splitted_mem_block->is_allocated = 0;
                         splitted_mem_block->parent_page = it_mem_block->parent_page;
