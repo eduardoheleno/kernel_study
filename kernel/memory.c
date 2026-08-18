@@ -348,19 +348,45 @@ uintptr_t mmap_ring3(void)
 
 void unmmap_ring3(uintptr_t page_directory_phys_addr)
 {
-    uintptr_t *tmp_virt_page_directory = map_tmp_page(page_directory_phys_addr);
-    uintptr_t page_table_phys_addr = tmp_virt_page_directory[0] & PAGE_MASK;
-    unmap_tmp_page();
+    uint32_t pte_idx = 0;
+    uint32_t pt_idx = 1;
+    for (; pte_idx < 768; pte_idx++)
+    {
+        for (; pt_idx < 1024; pt_idx++)
+        {
+            uintptr_t* tmp_pd = map_tmp_page(page_directory_phys_addr);
+            uint32_t pt_addr = tmp_pd[pte_idx];
+            unmap_tmp_page();
+            if (pt_addr & PAGE_PRESENT)
+            {
+                uintptr_t* tmp_pt = map_tmp_page(pt_addr);
+                uint32_t t_addr = tmp_pt[pt_idx];
+                if (t_addr != 0x0)
+                {
+                    terminal_writestring("table free\n");
+                    tmp_pt[pt_idx] = 0x0;
+                    pmm_free((void*)(t_addr & PAGE_MASK), 1);
+                }
+                unmap_tmp_page();
+            }
 
-    uintptr_t *tmp_virt_page_table = map_tmp_page(page_table_phys_addr);
-    uintptr_t page_table_entry_phys_addr1 = tmp_virt_page_table[1] & PAGE_MASK;
-    uintptr_t page_table_entry_phys_addr2 = tmp_virt_page_table[2] & PAGE_MASK;
-    unmap_tmp_page();
+            if (pt_idx + 1 >= 1024)
+            {
+                uintptr_t* tmp_pd = map_tmp_page(page_directory_phys_addr);
+                if (tmp_pd[pte_idx] & PAGE_PRESENT)
+                {
+                    terminal_writestring("page table free\n");
+                    tmp_pd[pte_idx] = 0x0;
+                    pmm_free((void*)(pt_addr & PAGE_MASK), 1);
+                }
+                unmap_tmp_page();
+            }
+        }
 
-    pmm_free((void*)page_directory_phys_addr, 1);
-    pmm_free((void*)page_table_phys_addr, 1);
-    pmm_free((void*)page_table_entry_phys_addr1, 1);
-    pmm_free((void*)page_table_entry_phys_addr2, 1);
+        pt_idx = 0;
+    }
+
+    pmm_free((void*)(page_directory_phys_addr & PAGE_MASK), 1);
 }
 
 static int8_t size_to_class(size_t size)
