@@ -1,27 +1,62 @@
-# TODO: organize ALL makefiles
+BUILD_DIR := build
+TARGET := $(BUILD_DIR)/myos
 
-all: boot_asm gdt_asm idt_asm scheduler_asm kernel link run
+CC := i686-elf-gcc
+AS := i686-elf-as
 
-boot_asm: boot.s
-	i686-elf-as boot.s -o boot.o
+CFLAGS := -std=gnu99 \
+		  -ffreestanding \
+		  -O2 \
+		  -Wall \
+		  -Wextra
 
-gdt_asm: ./gdt/gdt.s
-	i686-elf-as ./gdt/gdt.s -o gdt_asm.o
+CPPFLAGS := -I./include \
+		    -I../drivers/include
 
-idt_asm: ./idt/idt.s
-	i686-elf-as ./idt/idt.s -o idt_asm.o
+LDFLAGS := -T linker.ld \
+		   -ffreestanding \
+		   -O2 \
+		   -nostdlib
 
-scheduler_asm: ./scheduler/scheduler.s
-	i686-elf-as ./scheduler/scheduler.s -o scheduler_asm.o
+C_SRCS := \
+	kernel.c \
+	tty.c \
+	memory.c \
+	pic.c \
+	timer.c \
+	vfs.c \
+	gdt/gdt.c \
+	idt/idt.c \
+	scheduler/scheduler.c \
+	syscall/mmap.c \
+	syscall/munmap.c \
+	syscall/read.c \
+	syscall/write.c \
+	syscall/ioctl.c
 
-kernel: kernel.c tty.c memory.c pic.c timer.c ./gdt/gdt.c ./idt/idt.c ./scheduler/scheduler.c ./vfs.c ./syscall/mmap.c ./syscall/munmap.c ./syscall/read.c ./syscall/write.c ./syscall/ioctl.c
-	i686-elf-gcc -c kernel.c tty.c pic.c timer.c memory.c ./gdt/gdt.c ./idt/idt.c ./scheduler/scheduler.c ./vfs.c ./syscall/mmap.c ./syscall/munmap.c ./syscall/read.c ./syscall/write.c ./syscall/ioctl.c -I./include -I../drivers/include -std=gnu99 -ffreestanding -O2 -Wall -Wextra
+ASM_SRCS := \
+	boot.s \
+	gdt/gdt.s \
+	idt/idt.s \
+	scheduler/scheduler.s
 
-link: linker.ld
-	i686-elf-gcc -T linker.ld -o myos -ffreestanding -O2 -nostdlib boot.o gdt_asm.o gdt.o idt_asm.o idt.o scheduler_asm.o scheduler.o tty.o memory.o pic.o timer.o vfs.o mmap.o munmap.o read.o write.o ioctl.o ../drivers/keyboard.o kernel.o
+C_OBJS := $(C_SRCS:%.c=$(BUILD_DIR)/%.o)
+ASM_OBJS := $(ASM_SRCS:%.s=$(BUILD_DIR)/%_asm.o)
 
-run:
-	qemu-system-i386 -display cocoa,zoom-to-fit=on -m 3G -kernel myos -initrd ../userspace/hello.bin
+OBJS := $(ASM_OBJS) $(C_OBJS) ../drivers/build/keyboard.o
+
+.PHONY: all run clean
+
+$(TARGET): $(OBJS) linker.ld
+	$(CC) $(LDFLAGS) -o $@ $(OBJS)
+
+$(BUILD_DIR)/%.o: %.c
+	mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) $(CPPFLAGS) -c $< -o $@
+
+$(BUILD_DIR)/%_asm.o: %.s
+	mkdir -p $(dir $@)
+	$(AS) $< -o $@
 
 clean:
-	rm ./*.o ./myos
+	rm -rf $(BUILD_DIR)

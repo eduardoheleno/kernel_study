@@ -1,47 +1,65 @@
-.PHONY: all crt unistd stdio string libc malloc stdlib program clean
+BUILD_DIR := build
 
-all: crt unistd stdio string ioctl mmap munmap libc malloc free stdlib program
+CC := i686-elf-gcc
+LD := i686-elf-ld
+OBJCOPY := i686-elf-objcopy
+AR := i686-elf-ar
 
-crt:
-	i686-elf-gcc -ffreestanding -nostdlib -fno-pie -m32 -I ./libc/include/ -c ./crt/crt0.c -o crt0.o
+CFLAGS := -ffreestanding -nostdlib -fno-pie -m32 -Wall -Wextra
 
-unistd:
-	i686-elf-gcc -ffreestanding -nostdlib -fno-pie -m32 -I ./libc/include/ -c ./libc/unistd/exit.c -o exit.o
-	i686-elf-gcc -ffreestanding -nostdlib -fno-pie -m32 -I ./libc/include/ -c ./libc/unistd/read.c -o read.o
-	i686-elf-gcc -ffreestanding -nostdlib -fno-pie -m32 -I ./libc/include/ -c ./libc/unistd/write.c -o write.o
+CPPFLAGS := -I ./libc/include \
+			-I ./stdlib/include
 
-stdio:
-	i686-elf-gcc -ffreestanding -nostdlib -fno-pie -m32 -I ./libc/include/ -c ./libc/stdio/printf.c -o printf.o
-	i686-elf-gcc -ffreestanding -nostdlib -fno-pie -m32 -I ./libc/include/ -c ./libc/stdio/fgets.c -o fgets.o
+LIBC_LIB := $(BUILD_DIR)/libc.a
+STDLIB_LIB := $(BUILD_DIR)/stdlib.a
 
-string:
-	i686-elf-gcc -ffreestanding -nostdlib -fno-pie -m32 -I ./libc/include/ -c ./libc/string.c -o string.o
+HELLO_SRCS := ./programs/hello.c
+HELLO_OBJS := $(HELLO_SRCS:%.c=$(BUILD_DIR)/%.o)
+HELLO_ELF := $(BUILD_DIR)/hello.elf
+HELLO_PROGRAM := $(BUILD_DIR)/hello.bin
 
-ioctl:
-	i686-elf-gcc -ffreestanding -nostdlib -fno-pie -m32 -I ./libc/include/ -c ./libc/ioctl.c -o ioctl.o
+LIBC_SRCS := \
+		  ./libc/unistd/exit.c \
+		  ./libc/unistd/read.c \
+		  ./libc/unistd/write.c \
+		  ./libc/stdio/printf.c \
+		  ./libc/stdio/fgets.c \
+		  ./libc/string.c \
+		  ./libc/ioctl.c \
+		  ./libc/mmap.c \
+		  ./libc/munmap.c
 
-mmap:
-	i686-elf-gcc -ffreestanding -nostdlib -fno-pie -m32 -I ./libc/include/ -c ./libc/mmap.c -o mmap.o
+STDLIB_SRCS := \
+		  ./stdlib/malloc.c \
+		  ./stdlib/free.c
 
-munmap:
-	i686-elf-gcc -ffreestanding -nostdlib -fno-pie -m32 -I ./libc/include/ -c ./libc/munmap.c -o munmap.o
+CRT_SRCS := \
+		  ./crt/crt0.c
 
-libc:
-	i686-elf-ar rcs libc.a exit.o read.o write.o printf.o fgets.o string.o ioctl.o mmap.o munmap.o
+LIBC_OBJS := $(LIBC_SRCS:%.c=$(BUILD_DIR)/%.o)
+STDLIB_OBJS := $(STDLIB_SRCS:%.c=$(BUILD_DIR)/%.o)
+CRT_OBJS := $(CRT_SRCS:%.c=$(BUILD_DIR)/%.o)
+C_OBJS := $(LIBC_OBJS) $(STDLIB_OBJS) $(CRT_OBJS)
 
-malloc:
-	i686-elf-gcc -ffreestanding -nostdlib -fno-pie -m32 -I ./stdlib/include/ -I ./libc/include/ -c ./stdlib/malloc.c -o malloc.o
+.PHONY: all clean
 
-free:
-	i686-elf-gcc -ffreestanding -nostdlib -fno-pie -m32 -I ./stdlib/include/ -I ./libc/include/ -c ./stdlib/free.c -o free.o
+all: $(C_OBJS) $(LIBC_LIB) $(STDLIB_LIB) $(HELLO_PROGRAM)
 
-stdlib:
-	i686-elf-ar rcs stdlib.a malloc.o free.o
+$(BUILD_DIR)/%.o: %.c
+	mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) $(CPPFLAGS) -c $< -o $@
 
-program:
-	i686-elf-gcc -ffreestanding -nostdlib -fno-pie -m32 -I ./libc/include/ -I ./stdlib/include/ -c ./programs/hello.c -o hello.o
-	i686-elf-ld -m elf_i386 -Ttext=0x00001000 -e _start crt0.o hello.o stdlib.a libc.a -o hello.elf
-	i686-elf-objcopy -O binary hello.elf hello.bin
+$(LIBC_LIB): $(LIBC_OBJS)
+	$(AR) rcs $@ $^
+
+$(STDLIB_LIB): $(STDLIB_OBJS)
+	$(AR) rcs $@ $^
+
+$(HELLO_PROGRAM): $(HELLO_SRCS) $(LIBC_LIB) $(STDLIB_LIB) $(CRT_OBJS)
+	mkdir -p $(BUILD_DIR)/programs
+	$(CC) $(CFLAGS) $(CPPFLAGS) -c $(HELLO_SRCS) -o $(HELLO_OBJS)
+	$(LD) -m elf_i386 -Ttext=0x00001000 -e _start $(CRT_OBJS) $(HELLO_OBJS) $(STDLIB_LIB) $(LIBC_LIB) -o $(HELLO_ELF)
+	$(OBJCOPY) -O binary $(HELLO_ELF) $@
 
 clean:
-	rm -f *.o *.a *.elf *.bin
+	rm -rf $(BUILD_DIR)

@@ -39,8 +39,6 @@ void* malloc(size_t size)
     size_t aligned_size = align_up(size);
     size_t target_size = aligned_size + sizeof(mem_block_t);
     size_t alloc_size = target_size + sizeof(page_block_t);
-    uint32_t total_pages = pages_required(alloc_size);
-
     if (mem_pool == NULL)
     {
         page_block_t* new_page_block = alloc_page_block(alloc_size);
