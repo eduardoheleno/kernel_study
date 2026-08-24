@@ -23,6 +23,10 @@
 #define PDE_INDEX(addr) (((addr) >> 22) & 0x3FF)
 #define PTE_INDEX(addr) (((addr) >> 12) & 0x3FF)
 
+#define BIT_SET(arr, i)   ((arr)[(i) / 8] |=  (1u << ((i) % 8)))
+#define BIT_CLEAR(arr, i) ((arr)[(i) / 8] &= ~(1u << ((i) % 8)))
+#define BIT_GET(arr, i)   (((arr)[(i) / 8] >> ((i) % 8)) & 1u)
+
 #define KHEAP_PAGES_NUM (KHEAP_END - KHEAP_START) / PAGE_SIZE
 
 #define SLAB_16       16

@@ -3,6 +3,7 @@
 #include "tty.h"
 #include "scheduler.h"
 #include "syscall.h"
+#include "misc.h"
 
 static idt_entry_t idt_entries[256];
 static idt_t idt;
@@ -23,6 +24,7 @@ void exception_handler(cpu_exception_state_t *state)
             break;
         case 14:
             terminal_writestring("Page Fault!\n");
+            debug_write("Page Fault!\n");
             if (state->error_code >> 2 == 1)
             {
                 terminal_writestring("Terminating userspace process...\n");

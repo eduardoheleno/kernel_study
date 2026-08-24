@@ -37,8 +37,6 @@ static slab_cache_t slab_caches[] = {
     { SLAB_2048, NULL, NULL },
 };
 
-// TODO: current bitmap is using 8 bytes for every page which is pretty non efficient
-// The right approach is to use bitwise operations to use a single bit for each page
 static uint8_t *bitmap = NULL;
 static uint64_t bitmap_size = 0;
 
@@ -57,7 +55,7 @@ static void set_used_bitmaps(uint64_t start_index, uint64_t total_used_pages)
 {
     for (uint64_t i = 0; i < total_used_pages; i++) 
     {
-        bitmap[start_index] = BITMAP_USED;
+        BIT_SET(bitmap, start_index);
         start_index++;
     }
 }
@@ -67,7 +65,7 @@ static void populate_bitmap(multiboot_info_t *mbi, multiboot_memory_map_t *mmap,
     bitmap = (uint8_t*)align_up_4k(last_paged_addr + KERNEL_BASE);
     for (uint64_t i = 0; i < bitmap_size; i++) 
     {
-        bitmap[i] = BITMAP_FREE;
+        BIT_CLEAR(bitmap, i);
     }
 
     for (;;) 
@@ -142,7 +140,7 @@ uintptr_t pmm_alloc(uint32_t npages)
     uint32_t page_accumulator = 0;
     for (; i < bitmap_size; i++) 
     {
-        if (bitmap[i] != BITMAP_FREE) 
+        if (BIT_GET(bitmap, i) != BITMAP_FREE)
         {
             page_accumulator = 0;
         }
@@ -155,7 +153,7 @@ uintptr_t pmm_alloc(uint32_t npages)
 
     for (uint64_t j = i - (npages - 1); j <= i; j++) 
     {
-        bitmap[j] = BITMAP_USED;
+        BIT_SET(bitmap, j);
     }
 
     return ((i - (npages - 1)) * PAGE_SIZE);
@@ -167,8 +165,44 @@ void pmm_free(void *addr, uint32_t npages)
     uint64_t bitmap_idx = (uintptr_t)addr / PAGE_SIZE;
     for (uint64_t i = 0; i < npages; i++) 
     {
-        bitmap[bitmap_idx] = BITMAP_FREE;
+        BIT_CLEAR(bitmap, bitmap_idx);
         bitmap_idx++;
+    }
+}
+
+static void init_video_memory(multiboot_info_t* mbi)
+{
+    uint32_t base_pde = PDE_INDEX(KHEAP_END);
+    uint32_t base_pte = PTE_INDEX(KHEAP_END);
+    uint32_t base_addr = mbi->framebuffer_addr;
+    uint32_t pages = (mbi->framebuffer_pitch * mbi->framebuffer_height) / PAGE_SIZE;
+    for (uint32_t i = 0; i < pages; i++)
+    {
+        if (kernel_page_directory[base_pde] == 0x0)
+        {
+            uintptr_t page_table_phys_addr = pmm_alloc(1);
+            uintptr_t* new_page_table = map_tmp_page(page_table_phys_addr);
+            for (uint32_t i = 0; i < 1024; i++)
+            {
+                new_page_table[i] = 0x0;
+            }
+            unmap_tmp_page();
+
+            kernel_page_directory[base_pde] = (page_table_phys_addr & PAGE_MASK) | PAGE_PRESENT | PAGE_WRITABLE;
+        }
+
+        uintptr_t* kernel_page_table = map_tmp_page(kernel_page_directory[base_pde]);
+        kernel_page_table[base_pte] = (base_addr & PAGE_MASK) | PAGE_PRESENT | PAGE_WRITABLE;
+        unmap_tmp_page();
+        invlpg((base_pde << 22) | (base_pte << 12));
+
+        if (++base_pte >= 1024)
+        {
+            base_pte = 0;
+            base_pde++;
+        }
+        if (base_pde >= 1024) debug_write("erro");
+        base_addr += PAGE_SIZE;
     }
 }
 
@@ -183,7 +217,7 @@ void init_memory(unsigned long mbi_addr, unsigned long last_paged_addr, uintptr_
     bitmap_size = highest_addr / PAGE_SIZE;
     uintptr_t kernel_end_addr = align_up_4k(last_paged_addr);
 
-    uint64_t bitmap_len = bitmap_size * sizeof(uint8_t);
+    uint64_t bitmap_len = bitmap_size / 8;
     uint64_t total_bitmap_pages = bitmap_len / PAGE_SIZE;
 
     // TODO: fix this in a nicer way
@@ -201,6 +235,7 @@ void init_memory(unsigned long mbi_addr, unsigned long last_paged_addr, uintptr_
     userspace_module = *(multiboot_module_t*) mbi->mods_addr;
 
     populate_bitmap(mbi, mmap, kernel_end_addr, last_paged_addr);
+    init_video_memory(mbi);
     unmap_identity();
     reload_cr3();
 
@@ -236,7 +271,7 @@ static uintptr_t mmap(size_t npages, uint8_t flags)
     {
         uintptr_t page_phys_addr = pmm_alloc(1);
         uintptr_t *new_page = map_tmp_page(page_phys_addr);
-        for (uint32_t i = 0; i < 1024; i++) 
+        for (uint32_t i = 0; i < 1024; i++)
         {
             new_page[i] = 0x0;
         }

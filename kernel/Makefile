@@ -49,6 +49,9 @@ OBJS := $(ASM_OBJS) $(C_OBJS) ../drivers/build/keyboard.o
 
 $(TARGET): $(OBJS) linker.ld
 	$(CC) $(LDFLAGS) -o $@ $(OBJS)
+	cp $@ ../iso/boot/myos
+	cp ../userspace/build/hello.bin ../iso/boot/hello.bin
+	i686-elf-grub-mkrescue -o ../myos.iso ../iso
 
 $(BUILD_DIR)/%.o: %.c
 	mkdir -p $(dir $@)

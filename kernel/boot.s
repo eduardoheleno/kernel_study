@@ -1,14 +1,32 @@
 .set ALIGN,    1<<0             # align loaded modules on page boundaries
 .set MEMINFO,  1<<1             # provide memory map
-.set FLAGS,    ALIGN | MEMINFO  # this is the Multiboot 'flag' field
+.set VIDEO,    1<<2
+
+.set FLAGS,    ALIGN | MEMINFO | VIDEO  # this is the Multiboot 'flag' field
 .set MAGIC,    0x1BADB002       # 'magic number' lets bootloader find the header
 .set CHECKSUM, -(MAGIC + FLAGS) # checksum of above, to prove we are multiboot
+
+.set MODE_TYPE, 0
+.set FB_WIDTH,  1024
+.set FB_HEIGHT, 768
+.set FB_DEPTH,  32
 
 .section .multiboot.data, "aw"
 .align 4
 .long MAGIC
 .long FLAGS
 .long CHECKSUM
+
+.long 0
+.long 0
+.long 0
+.long 0
+.long 0
+
+.long MODE_TYPE
+.long FB_WIDTH
+.long FB_HEIGHT
+.long FB_DEPTH
 
 .section .bootstrap_stack, "aw", @nobits
 stack_bottom:
@@ -20,7 +38,7 @@ stack_top:
 .align 4096
 kernel_page_directory:
 	.skip 4096
-boot_page_table1:
+boot_page_table:
 	.skip 4096
 
 .section .multiboot.text, "a"
@@ -32,7 +50,7 @@ readonly_page:
 .global _start
 .type _start, @function
 _start:
-	movl $(boot_page_table1 - 0xC0000000), %edi
+	movl $(boot_page_table - 0xC0000000), %edi
 	movl $0, %esi
 	movl $1023, %ecx
 
@@ -51,14 +69,14 @@ _start:
 3:
 	# Size of page is 4096 bytes.
 	addl $4096, %esi
-	# Size of entries in boot_page_table1 is 4 bytes.
+	# Size of entries in boot_page_table is 4 bytes.
 	addl $4, %edi
 	# Loop to the next entry if we haven't finished.
 	loop 1b
 
 4:
 	# Map VGA video memory to 0xC03FF000 as "present, writable".
-	movl $(0x000B8000 | 0x003), boot_page_table1 - 0xC0000000 + 1023 * 4
+	movl $(0x000B8000 | 0x003), boot_page_table - 0xC0000000 + 1023 * 4
 
 	# The page table is used at both page directory entry 0 (virtually from 0x0
 	# to 0x3FFFFF) (thus identity mapping the kernel) and page directory entry
@@ -68,8 +86,8 @@ _start:
 	# would instead page fault if there was no identity mapping.
 
 	# Map the page table to both virtual addresses 0x00000000 and 0xC0000000.
-	movl $(boot_page_table1 - 0xC0000000 + 0x003), kernel_page_directory - 0xC0000000 + 0
-	movl $(boot_page_table1 - 0xC0000000 + 0x003), kernel_page_directory - 0xC0000000 + 768 * 4
+	movl $(boot_page_table - 0xC0000000 + 0x003), kernel_page_directory - 0xC0000000 + 0
+	movl $(boot_page_table - 0xC0000000 + 0x003), kernel_page_directory - 0xC0000000 + 768 * 4
 
 	# Set cr3 to the address of the kernel_page_directory.
 	movl $(kernel_page_directory - 0xC0000000), %ecx
