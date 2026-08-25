@@ -32,7 +32,9 @@ C_SRCS := \
 	syscall/munmap.c \
 	syscall/read.c \
 	syscall/write.c \
-	syscall/ioctl.c
+	syscall/ioctl.c \
+	graphics/framebuffer.c \
+	graphics/font.c
 
 ASM_SRCS := \
 	boot.s \

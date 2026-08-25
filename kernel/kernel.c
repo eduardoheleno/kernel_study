@@ -2,7 +2,6 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "tty.h"
 #include "gdt.h"
 #include "idt.h"
 #include "memory.h"
@@ -26,8 +25,8 @@
 
 // TODO: improve code organization
 // TODO: check memory alignment on kernel allocation
-// TODO: check use of invlpg (should be used only with virtual addresses)
 // TODO: test entire flow of malloc
+// TODO: parse psf fonts
 void kernel_main(
         uintptr_t *kernel_page_table_idx,
         unsigned long last_paged_addr,
@@ -35,12 +34,11 @@ void kernel_main(
         unsigned long mbi_addr
      )
 {
-    terminal_initialize();
+    init_memory(mbi_addr, last_paged_addr, kernel_page_table_idx);
     gdt_init();
     idt_init();
     pic_init(0x20, 0x28);
     pit_init();
-    init_memory(mbi_addr, last_paged_addr, kernel_page_table_idx);
     init_vfs();
     init_scheduler();
     enable_interrupts();

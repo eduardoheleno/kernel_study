@@ -2,6 +2,7 @@
 
 #include "memory.h"
 #include "scheduler.h"
+#include "graphics/font.h"
 #include "misc.h"
 
 static size_t terminal_row;
@@ -35,31 +36,11 @@ static inline uint16_t vga_entry(unsigned char uc, uint8_t color)
 	return (uint16_t) uc | (uint16_t) color << 8;
 }
 
-static void enable_cursor(uint8_t cursor_start, uint8_t cursor_end)
-{
-    outb(0x3D4, 0x0A);
-    outb(0x3D5, (inb(0x3D5) & 0xC0) | cursor_start);
-
-    outb(0x3D4, 0x0B);
-    outb(0x3D5, (inb(0x3D5) & 0xE0) | cursor_end);
-}
-
-static void update_cursor(int x, int y)
-{
-    uint16_t pos = y * VGA_WIDTH + x;
-
-    outb(0x3D4, 0x0F);
-    outb(0x3D5, (uint8_t) (pos & 0xFF));
-    outb(0x3D4, 0x0E);
-    outb(0x3D5, (uint8_t) ((pos >> 8) & 0xFF));
-}
-
 void terminal_initialize(void) 
 {
 	terminal_row = 0;
 	terminal_column = 0;
 	terminal_color = vga_entry_color(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
-    update_cursor(terminal_column, terminal_row);
 	
 	for (size_t y = 0; y < VGA_HEIGHT; y++) 
     {
@@ -69,8 +50,6 @@ void terminal_initialize(void)
 			terminal_buffer[index] = vga_entry(' ', terminal_color);
 		}
 	}
-
-    enable_cursor(0, 15);
 }
 
 void terminal_setcolor(uint8_t color) 
@@ -90,19 +69,16 @@ void terminal_putchar(char c)
     {
         terminal_row++;
         terminal_column = 0;
-        update_cursor(terminal_column, terminal_row);
         return;
     }
 
-	terminal_putentryat(c, terminal_color, terminal_column, terminal_row);
+    put_char(terminal_column * DEFAULT_HEIGHT_SPACING, terminal_row * DEFAULT_HEIGHT_SPACING, 0xFFFFFFFF, c);
 	if (++terminal_column == VGA_WIDTH) 
     {
 		terminal_column = 0;
 		if (++terminal_row == VGA_HEIGHT)
 			terminal_row = 0;
 	}
-
-    update_cursor(terminal_column, terminal_row);
 }
 
 void terminal_write(const char* data, size_t size) 
