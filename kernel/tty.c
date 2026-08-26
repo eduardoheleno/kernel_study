@@ -3,7 +3,6 @@
 #include "memory.h"
 #include "scheduler.h"
 #include "graphics/font.h"
-#include "misc.h"
 
 static size_t terminal_row;
 static size_t terminal_column;
@@ -72,7 +71,7 @@ void terminal_putchar(char c)
         return;
     }
 
-    put_char(terminal_column * DEFAULT_HEIGHT_SPACING, terminal_row * DEFAULT_HEIGHT_SPACING, 0xFFFFFFFF, c);
+    put_char(terminal_column * DEFAULT_WIDTH_SPACING, terminal_row * DEFAULT_HEIGHT_SPACING, 0xAAAAAA, c);
 	if (++terminal_column == VGA_WIDTH) 
     {
 		terminal_column = 0;

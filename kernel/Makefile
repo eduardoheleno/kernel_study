@@ -45,7 +45,7 @@ ASM_SRCS := \
 C_OBJS := $(C_SRCS:%.c=$(BUILD_DIR)/%.o)
 ASM_OBJS := $(ASM_SRCS:%.s=$(BUILD_DIR)/%_asm.o)
 
-OBJS := $(ASM_OBJS) $(C_OBJS) ../drivers/build/keyboard.o
+OBJS := $(ASM_OBJS) $(C_OBJS) ../drivers/build/keyboard.o ../initrd/fonts/font.o
 
 .PHONY: all run clean
 

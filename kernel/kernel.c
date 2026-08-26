@@ -10,6 +10,7 @@
 #include "vfs.h"
 #include "scheduler.h"
 #include "misc.h"
+#include "graphics/font.h"
 
 /* Check if the compiler thinks you are targeting the wrong operating system. */
 #if defined(__linux__)
@@ -34,6 +35,7 @@ void kernel_main(
         unsigned long mbi_addr
      )
 {
+    load_psf2_font();
     init_memory(mbi_addr, last_paged_addr, kernel_page_table_idx);
     gdt_init();
     idt_init();
