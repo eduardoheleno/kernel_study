@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include <stddef.h>
+#include "multiboot.h"
 
 #define KERNEL_BASE   0xC0000000
 #define KHEAP_START   0xC0400000
@@ -67,7 +68,7 @@ struct slab_cache
 };
 typedef struct slab_cache slab_cache_t;
 
-void init_memory(unsigned long mbi_addr, unsigned long last_paged_addr, uintptr_t *kernel_page_table_idx);
+void init_memory(multiboot_info_t* mbi, unsigned long last_paged_addr, uintptr_t *kernel_page_table_idx);
 
 uintptr_t pmm_alloc(uint32_t npages);
 void pmm_free(void *addr, uint32_t npages);

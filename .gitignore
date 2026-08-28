@@ -6,3 +6,4 @@ myos
 compile_commands.json
 .cache/
 *.iso
+*.img

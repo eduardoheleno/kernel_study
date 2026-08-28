@@ -52,7 +52,7 @@ OBJS := $(ASM_OBJS) $(C_OBJS) ../drivers/build/keyboard.o ../initrd/fonts/font.o
 $(TARGET): $(OBJS) linker.ld
 	$(CC) $(LDFLAGS) -o $@ $(OBJS)
 	cp $@ ../iso/boot/myos
-	cp ../userspace/build/hello.bin ../iso/boot/hello.bin
+	cp ../userspace/build/hello.bin ../initrd/bin/hello
 	i686-elf-grub-mkrescue -o ../myos.iso ../iso
 
 $(BUILD_DIR)/%.o: %.c
@@ -63,5 +63,10 @@ $(BUILD_DIR)/%_asm.o: %.s
 	mkdir -p $(dir $@)
 	$(AS) $< -o $@
 
+initrd:
+	tar --format=ustar -cf ./build/initrd.img -C ../initrd .
+	cp ./build/initrd.img ../iso/boot/initrd.img
+
 clean:
+	rm ../myos.iso
 	rm -rf $(BUILD_DIR)

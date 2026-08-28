@@ -76,6 +76,13 @@ static inline void load_cr3(uintptr_t pd_phys_addr)
     );
 }
 
+static inline void unmap_identity()
+{
+    asm volatile (
+        "movl $0, kernel_page_directory + 0"
+    );
+}
+
 static inline uint32_t pages_required(uint32_t len)
 {
     return (len + PAGE_SIZE - 1) / PAGE_SIZE;

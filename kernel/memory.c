@@ -1,7 +1,6 @@
 #include "memory.h"
 
 #include "graphics/framebuffer.h"
-#include "multiboot.h"
 #include "misc.h"
 #include "tty.h"
 #include <stddef.h>
@@ -61,9 +60,10 @@ static void set_used_bitmaps(uint64_t start_index, uint64_t total_used_pages)
     }
 }
 
-static void populate_bitmap(multiboot_info_t *mbi, multiboot_memory_map_t *mmap, uintptr_t kernel_end_addr, unsigned long last_paged_addr)
+static void populate_bitmap(multiboot_info_t *mbi, multiboot_memory_map_t *mmap,
+        uintptr_t kernel_end_addr, multiboot_module_t* initrd_module)
 {
-    bitmap = (uint8_t*)align_up_4k(last_paged_addr + KERNEL_BASE);
+    bitmap = (uint8_t*)(initrd_module->mod_end + KERNEL_BASE);
     for (uint64_t i = 0; i < bitmap_size; i++) 
     {
         BIT_CLEAR(bitmap, i);
@@ -103,13 +103,12 @@ static void populate_bitmap(multiboot_info_t *mbi, multiboot_memory_map_t *mmap,
     uint64_t total_used_pages = range_size / PAGE_SIZE;
     if (range_size % PAGE_SIZE > 0) total_used_pages++;
     set_used_bitmaps(start_index, total_used_pages);
-}
 
-static void unmap_identity()
-{
-    asm volatile (
-        "movl $0, kernel_page_directory + 0"
-    );
+    // set used based on module
+    uint64_t module_start_index = align_down_4k(initrd_module->mod_start) / PAGE_SIZE;
+    uint64_t module_final_index = align_up_4k(initrd_module->mod_end) / PAGE_SIZE;
+    uint64_t module_total_used_pages = module_final_index - module_start_index;
+    set_used_bitmaps(module_start_index, module_total_used_pages);
 }
 
 uintptr_t* map_tmp_page(uintptr_t phys_addr)
@@ -171,10 +170,11 @@ void pmm_free(void *addr, uint32_t npages)
     }
 }
 
-void init_memory(unsigned long mbi_addr, unsigned long last_paged_addr, uintptr_t *kernel_page_table_idx)
+void init_memory(multiboot_info_t* mbi, unsigned long last_paged_addr,
+        uintptr_t *kernel_page_table_idx)
 {
-    multiboot_info_t *mbi = (multiboot_info_t*)mbi_addr;
     multiboot_memory_map_t *mmap = (multiboot_memory_map_t*)mbi->mmap_addr;
+    multiboot_module_t* mbm = (multiboot_module_t*)mbi->mods_addr;
 
     multiboot_memory_map_t *highest_block = fetch_highest_block(mbi, mmap);
     uint64_t highest_addr = highest_block->addr + highest_block->len;
@@ -182,11 +182,11 @@ void init_memory(unsigned long mbi_addr, unsigned long last_paged_addr, uintptr_
     bitmap_size = highest_addr / PAGE_SIZE;
     uintptr_t kernel_end_addr = align_up_4k(last_paged_addr);
 
-    uint64_t bitmap_len = bitmap_size / 8;
-    uint64_t total_bitmap_pages = bitmap_len / PAGE_SIZE;
-
-    // TODO: fix this in a nicer way
-    for (uint64_t i = 0; i < total_bitmap_pages + 2; i++) 
+    uint64_t bitmap_len = (bitmap_size + 7) / 8;
+    uint64_t total_bitmap_pages = (bitmap_len + PAGE_SIZE - 1) / PAGE_SIZE;
+    uint32_t total_module_pages = (align_up_4k(mbm->mod_end) / PAGE_SIZE)
+        - (align_down_4k(mbm->mod_start) / PAGE_SIZE);
+    for (uint64_t i = 0; i < total_bitmap_pages + total_module_pages; i++) 
     {
         *kernel_page_table_idx = kernel_end_addr | PAGE_PRESENT | PAGE_WRITABLE;
 
@@ -194,15 +194,10 @@ void init_memory(unsigned long mbi_addr, unsigned long last_paged_addr, uintptr_
         kernel_page_table_idx++;
     }
 
-    // TODO: fix this in a nicer way
-    last_paged_addr += PAGE_SIZE * 2;
     tmp_map_addr = kernel_end_addr + KERNEL_BASE;
-    userspace_module = *(multiboot_module_t*) mbi->mods_addr;
 
-    populate_bitmap(mbi, mmap, kernel_end_addr, last_paged_addr);
+    populate_bitmap(mbi, mmap, kernel_end_addr, (multiboot_module_t*)mbi->mods_addr);
     init_video_memory(mbi);
-    unmap_identity();
-    reload_cr3();
 
     terminal_writestring("Memory initialized\n");
 }

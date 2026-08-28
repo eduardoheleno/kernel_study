@@ -27,7 +27,6 @@
 // TODO: improve code organization
 // TODO: check memory alignment on kernel allocation
 // TODO: test entire flow of malloc
-// TODO: parse psf fonts
 void kernel_main(
         uintptr_t *kernel_page_table_idx,
         unsigned long last_paged_addr,
@@ -35,15 +34,20 @@ void kernel_main(
         unsigned long mbi_addr
      )
 {
+    multiboot_info_t* mbi = (multiboot_info_t*)mbi_addr;
+
     load_psf2_font();
-    init_memory(mbi_addr, last_paged_addr, kernel_page_table_idx);
+    init_memory(mbi, last_paged_addr, kernel_page_table_idx);
     gdt_init();
     idt_init();
     pic_init(0x20, 0x28);
     pit_init();
-    init_vfs();
+    init_vfs(mbi);
     init_scheduler();
     enable_interrupts();
+
+    unmap_identity();
+    reload_cr3();
 
     for (;;) 
     {

@@ -3,6 +3,7 @@
 
 #include <stddef.h>
 #include <stdint.h>
+#include "multiboot.h"
 
 #define FD_STDIN  0
 #define FD_STDOUT 1
@@ -35,7 +36,23 @@ struct file
 };
 typedef struct file file_t;
 
-void init_vfs(void);
+struct tar_header
+{
+	char file_path[100];
+	char file_mode[8];
+	char owner_user_id[8];
+	char owner_group_id[8];
+	char file_size[12];
+	char file_mtime[12];
+	char header_checksum[8];
+	char file_type;
+	char link_path[100];
+
+	char padding[255];
+};
+typedef struct tar_header tar_header;
+
+void init_vfs(multiboot_info_t* mbi);
 file_t* open_file(vnode_t *vnode, uint8_t flags);
 
 #endif
