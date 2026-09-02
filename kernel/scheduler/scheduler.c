@@ -5,7 +5,6 @@
 #include "timer.h"
 #include "gdt.h"
 #include "misc.h"
-#include "vfs.h"
 #include "tty.h"
 
 task_t *current_task = NULL;

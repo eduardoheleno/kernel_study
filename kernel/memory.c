@@ -490,3 +490,26 @@ void kfree(void *ptr)
         unmmap((uintptr_t) slab, 1);
     }
 }
+
+void* kmemcpy(void* to, void* from, size_t size)
+{
+    uint8_t* cast_to = (uint8_t*)to;
+    uint8_t* cast_from = (uint8_t*)from;
+    for (size_t i = 0; i < size; i++)
+    {
+        cast_to[i] = cast_from[i];
+    }
+
+    return to;
+}
+
+void* kmemset(void* ptr, int x, size_t n)
+{
+    uint8_t* cast_ptr = (uint8_t*)ptr;
+    for (size_t i = 0; i < n; i++)
+    {
+        cast_ptr[i] = x;
+    }
+
+    return ptr;
+}

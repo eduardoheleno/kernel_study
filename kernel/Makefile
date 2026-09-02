@@ -24,7 +24,8 @@ C_SRCS := \
 	memory.c \
 	pic.c \
 	timer.c \
-	vfs.c \
+	filesystem/fs.c \
+	filesystem/disk.c \
 	gdt/gdt.c \
 	idt/idt.c \
 	scheduler/scheduler.c \

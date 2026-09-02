@@ -77,6 +77,8 @@ void unmap_tmp_page(void);
 
 void* kmalloc(size_t size);
 void kfree(void *ptr);
+void* kmemcpy(void* to, void* from, size_t size);
+void* kmemset(void* ptr, int x, size_t n);
 
 uintptr_t mmap_ring3(void);
 void unmmap_ring3(uintptr_t page_directory_phys_addr);

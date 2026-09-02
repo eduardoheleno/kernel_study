@@ -4,7 +4,7 @@
 #include <stdint.h>
 #include <stddef.h>
 
-#include "vfs.h"
+#include "filesystem/fs.h"
 
 #define IDLE_PID   0
 #define REAPER_PID 1

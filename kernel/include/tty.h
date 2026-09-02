@@ -1,7 +1,7 @@
 #ifndef _KERNEL_TTY_H
 #define _KERNEL_TTY_H
 
-#include "vfs.h"
+#include "filesystem/fs.h"
 
 #include <stdint.h>
 #include <stddef.h>
