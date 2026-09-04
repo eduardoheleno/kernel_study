@@ -68,9 +68,15 @@ int disk_read(uint32_t lba, uint32_t sectors, uint16_t* buffer)
     wait_bsy();
     wait_drq();
 
-    for (int i = 0; i < 256; i++)
+    for (uint32_t i = 0; i < sectors; i++)
     {
-        buffer[i] = inw(BASE);
+        wait_bsy();
+        wait_drq();
+
+        for (uint32_t j = 0; j < 256; j++)
+        {
+            buffer[i * 256 + j] = inw(BASE);
+        }
     }
     
     return 1;
@@ -100,7 +106,7 @@ int disk_write(uint32_t lba, uint32_t sectors, const uint8_t* buffer)
 
         for (uint32_t j = 0; j < 256; j++)
         {
-            outw(BASE, ptr[j]);
+            outw(BASE, ptr[i * 256 + j]);
         }
     }
 

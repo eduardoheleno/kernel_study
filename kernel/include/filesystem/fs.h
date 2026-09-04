@@ -5,6 +5,9 @@
 #include <stdint.h>
 #include "multiboot.h"
 
+#define IBLOCK_OFFSET 25
+#define DATA_OFFSET   65
+
 #define FD_STDIN  0
 #define FD_STDOUT 1
 #define FD_STDERR 2
@@ -16,8 +19,8 @@ struct inode
 {
     uint8_t type;
     uint16_t size;
-    uint32_t blocks;
-    uint32_t block[15];
+    uint16_t sectors;
+    uint32_t sector[14];
 };
 typedef struct inode inode_t;
 
@@ -70,7 +73,7 @@ struct tar_header
 };
 typedef struct tar_header tar_header;
 
-void init_fs(void);
+void init_fs(multiboot_info_t* mbi);
 void init_vfs(multiboot_info_t* mbi);
 file_t* open_file(vnode_t *vnode, uint8_t flags);
 

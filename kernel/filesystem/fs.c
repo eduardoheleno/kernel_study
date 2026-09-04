@@ -55,11 +55,99 @@ static void init_iblock(void)
 {
     uint8_t* iblock_area = kmalloc(20480);
     kmemset(iblock_area, 0, 20480);
-    disk_write(25, 40, iblock_area);
+    disk_write(IBLOCK_OFFSET, 40, iblock_area);
     kfree(iblock_area);
 }
 
-void init_fs(void)
+static int alloc_inode_num(void)
+{
+    uint8_t inode_bmap[4096];
+    kmemset(inode_bmap, 0, sizeof(inode_bmap));
+    disk_read(9, 8, (uint16_t*)inode_bmap);
+
+    for (uint16_t i = 0; i < 4096; i++)
+    {
+        for (uint16_t j = 0; j < 8; j++)
+        {
+            uint8_t bit = (inode_bmap[i] >> j) & 1;
+            if (bit == 0)
+            {
+                inode_bmap[i] |= (1 << j);
+                disk_write(9, 8, inode_bmap);
+                return i * 8 + j;
+            }
+        }
+    }
+
+    return -1;
+}
+
+static void write_inode_data(inode_t* inode, uint8_t* data, size_t size)
+{
+    uint8_t data_bmap[4096];
+    kmemset(data_bmap, 0, sizeof(data_bmap));
+    disk_read(17, 8, (uint16_t*)data_bmap);
+
+    uint8_t* data_buffer = kmalloc(512 * inode->sectors);
+    kmemset(data_buffer, 0, 512 * inode->sectors);
+    kmemcpy(data_buffer, data, size);
+    uint32_t sectors_count = 0;
+    for (uint16_t i = 0; i < 4096; i++)
+    {
+        for (uint16_t j = 0; j < 8; j++)
+        {
+            if (sectors_count >= inode->sectors) break;
+
+            uint8_t bit = (data_bmap[i] >> j) & 1;
+            if (bit == 0)
+            {
+                data_bmap[i] |= (1 << j);
+                uint32_t sector_idx = i * 8 + j;
+                inode->sector[sectors_count] = sector_idx;
+                disk_write(DATA_OFFSET + sector_idx, 1, &data_buffer[sectors_count++ * 512]);
+            }
+        }
+    }
+
+    disk_write(17, 8, data_bmap);
+    kfree(data_buffer);
+}
+
+static uint8_t* read_inode_data(inode_t inode)
+{
+    uint8_t* data_buffer = kmalloc(512 * inode.sectors);
+    for (uint32_t i = 0; i < inode.sectors; i++)
+    {
+        disk_read(DATA_OFFSET + inode.sector[i], 1, (uint16_t*)&data_buffer[i * 512]);
+    }
+
+    return data_buffer;
+}
+
+static void write_inode(inode_t inode, uint32_t inode_num)
+{
+    uint32_t inode_sector = inode_num / 8;
+    uint32_t inode_offset = inode_num % 8;
+    uint8_t sector_buffer[512];
+    disk_read(IBLOCK_OFFSET + inode_sector, 1, (uint16_t*)sector_buffer);
+
+    kmemcpy(&sector_buffer[inode_offset * sizeof(inode_t)], &inode, sizeof(inode_t));
+    disk_write(IBLOCK_OFFSET + inode_sector, 1, sector_buffer);
+}
+
+static void read_inode(uint32_t inode_num, inode_t* inode_buffer)
+{
+    uint32_t inode_sector = inode_num / 8;
+    uint32_t inode_offset = inode_num % 8;
+    uint8_t sector_buffer[512];
+    disk_read(IBLOCK_OFFSET + inode_sector, 1, (uint16_t*)sector_buffer);
+
+    kmemcpy(inode_buffer, &sector_buffer[inode_offset * sizeof(inode_t)], sizeof(inode_t));
+}
+
+
+
+void init_fs(multiboot_info_t* mbi)
 {
     // TODO: check possible error
     init_disk();
@@ -67,45 +155,60 @@ void init_fs(void)
     init_dbmap();
     init_iblock();
 
-    inode_t root;
-    root.type = DIR_TYPE;
-    root.size = 68;
-    root.blocks = 1;
+    multiboot_module_t* mbm = (multiboot_module_t*)mbi->mods_addr;
+    tar_header* th = (tar_header*)mbm->mod_start;
 
-    uint8_t inode_buffer[512];
-    kmemset(inode_buffer, 0, sizeof(inode_buffer));
-    kmemcpy(inode_buffer, &root, sizeof(root));
-
-    disk_write(25, 1, inode_buffer);
-
-    uint8_t inode_buffer2[512];
-    disk_read(25, 1, (uint16_t*)inode_buffer2);
-
-    inode_t root2;
-    kmemcpy(&root2, inode_buffer2, sizeof(inode_t));
-    debug_int(root2.size);
+    uint64_t file_size = tar_parse_octal(th->file_size, sizeof(th->file_size));
+    uint8_t* file_data = (uint8_t*)th + sizeof(*th);
+    // file_data[0] -> file_data[file_size - 1]
     
-    // disk_read(25, 1, (uint16_t*)inode_buffer);
-    //
-    // inode_t root = *(inode_t*)inode_buffer;
-    // debug_int(root.type);
+    th = (tar_header *)(
+        file_data + ((file_size + 511) & ~(uint64_t)511)
+    );
 
-    // entries[0].name = ".";
+    // th = (tar_header *)(
+    //     (uint8_t *)th +
+    //     512 +
+    //     ((tar_parse_octal(th->file_size, sizeof(th->file_size)) + 511) & ~511)
+    // );
+    // th = (tar_header *)(
+    //     (uint8_t *)th +
+    //     512 +
+    //     ((tar_parse_octal(th->file_size, sizeof(th->file_size)) + 511) & ~511)
+    // );
+    // th = (tar_header *)(
+    //     (uint8_t *)th +
+    //     512 +
+    //     ((tar_parse_octal(th->file_size, sizeof(th->file_size)) + 511) & ~511)
+    // );
+    // th = (tar_header *)(
+    //     (uint8_t *)th +
+    //     512 +
+    //     ((tar_parse_octal(th->file_size, sizeof(th->file_size)) + 511) & ~511)
+    // );
+    // th = (tar_header *)(
+    //     (uint8_t *)th +
+    //     512 +
+    //     ((tar_parse_octal(th->file_size, sizeof(th->file_size)) + 511) & ~511)
+    // );
+    // debug_write(th->file_path);
 
-    // uint8_t magic_buffer[512];
-    // disk_read(0, 1, (uint16_t*)magic_buffer);
+    // int iroot_num = alloc_inode_num();
+    // struct dir_entry root_entries[2];
+    // root_entries[0].inode_number = iroot_num;
+    // root_entries[1].inode_number = iroot_num;
+    // kmemcpy(root_entries[0].name, ".", 1);
+    // kmemcpy(root_entries[1].name, "..", 2);
     //
-    // terminal_writestring("\n");
-    // terminal_writehex(*(uint32_t*)magic_buffer);
-    // terminal_writestring("\n");
-
-    // uint8_t magic_buffer[512];
-    // kmemset(magic_buffer, 0, sizeof(magic_buffer));
+    // inode_t root_inode;
+    // root_inode.type = DIR_TYPE;
+    // root_inode.size = sizeof(root_entries);
+    // root_inode.sectors = (sizeof(root_entries) + 511) / 512;
     //
-    // uint16_t magic = 0x776;
-    // kmemcpy(magic_buffer, &magic, sizeof(magic));
+    // write_inode_data(&root_inode, (uint8_t*)root_entries, sizeof(root_entries));
+    // write_inode(root_inode, iroot_num);
     //
-    // disk_write(0, 1, magic_buffer);
+    // read_inode_data(root_inode);
 }
 
 void init_vfs(multiboot_info_t* mbi)

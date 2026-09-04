@@ -176,4 +176,30 @@ static inline void debug_hex64(uint64_t value)
     }
 }
 
+static inline uint64_t tar_parse_octal(const char *field, size_t length)
+{
+    uint64_t value = 0;
+    size_t i = 0;
+
+    while (i < length && field[i] == ' ') {
+        i++;
+    }
+
+    for (; i < length; i++) {
+        char c = field[i];
+
+        if (c == '\0' || c == ' ') {
+            break;
+        }
+
+        if (c < '0' || c > '7') {
+            break;
+        }
+
+        value = (value << 3) | (uint64_t)(c - '0');
+    }
+
+    return value;
+}
+
 #endif

@@ -11,7 +11,6 @@
 #include "scheduler.h"
 #include "misc.h"
 #include "graphics/font.h"
-#include "tty.h"
 
 /* Check if the compiler thinks you are targeting the wrong operating system. */
 #if defined(__linux__)
@@ -43,38 +42,12 @@ void kernel_main(
     idt_init();
     pic_init(0x20, 0x28);
     pit_init();
-    init_fs();
+    init_fs(mbi);
     init_scheduler();
     enable_interrupts();
 
     unmap_identity();
     reload_cr3();
-
-    uint32_t lba = 10;
-
-    outb(0x1F6, 0xE0 | ((lba >> 24) & 0x0F));
-    outb(0x1F2, 1);
-
-    outb(0x1F3, (uint8_t)lba);
-    outb(0x1F4, (uint8_t)(lba >> 8));
-    outb(0x1F5, (uint8_t)(lba >> 16));
-
-    outb(0x1F7, 0x20);
-
-    uint8_t rstatus;
-
-    do {
-        rstatus = inb(0x1F7);
-        if (rstatus & 0x01) terminal_writestring("bad!");
-    } while ((rstatus & 0x80) || !(rstatus & 0x08));
-
-    uint16_t* words = kmalloc(1000);
-    for (int i = 0; i < 256; i++)
-    {
-        words[i] = inw(0x1F0);
-    }
-
-    terminal_writestring((char*)words);
 
     for (;;) 
     {
